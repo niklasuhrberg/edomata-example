@@ -38,7 +38,7 @@ object Main extends ZIOAppDefault {
       // But we will directly call a few commands as an example here
       t0 <- Clock.instant
       _ <- app.accounts.service(
-        CommandMessage("cmd-id-1", t0, "account-1", accounts.Command.Open)
+        CommandMessage("cmd-id-1", t0, "account-1", accounts.Command.Open("categoryName"))
       )
 
       // After a while some money arrives, so let's deposit it

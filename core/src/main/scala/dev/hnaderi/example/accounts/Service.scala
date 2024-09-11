@@ -17,7 +17,7 @@
 package dev.hnaderi.example.accounts
 
 enum Command {
-  case Open
+  case Open(category:String)
   case Deposit(amount: BigDecimal)
   case Withdraw(amount: BigDecimal)
   case Close
@@ -34,9 +34,9 @@ object AccountService extends Account.Service[Command, Notification] {
 
   def apply[F[_]: Monad]: App[F, Unit] = App.router {
 
-    case Command.Open =>
+    case Command.Open(category) =>
       for {
-        ns <- App.state.decide(_.open)
+        ns <- App.state.decide(_.open(category))
         acc <- App.aggregateId
         _ <- App.publish(Notification.AccountOpened(acc))
       } yield ()
@@ -54,6 +54,8 @@ object AccountService extends Account.Service[Command, Notification] {
         accId <- App.aggregateId
         _ <- App.publish(Notification.BalanceUpdated(accId, withdrawn.balance))
       } yield ()
+
+      
 
     case Command.Close =>
       App.state.decide(_.close).void

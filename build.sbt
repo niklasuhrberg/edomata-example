@@ -1,4 +1,10 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
+
+val Http4sVersion = "0.23.27"
+val CirceVersion = "0.14.9"
+val MunitVersion = "1.0.0"
+val LogbackVersion = "1.5.6"
+val MunitCatsEffectVersion = "2.0.0"
 ThisBuild / tlBaseVersion := "0.0" // your current series x.y
 
 ThisBuild / organization := "dev.hnaderi"
@@ -32,7 +38,16 @@ lazy val catsEffect = crossProject(JVMPlatform, JSPlatform)
   .dependsOn(domain)
   .enablePlugins(NoPublishPlugin)
   .settings(
-    name := "edomata-ce-example"
+    name := "edomata-ce-example",
+    libraryDependencies ++= Seq(
+      "org.http4s"      %% "http4s-ember-server" % Http4sVersion,
+      "org.http4s"      %% "http4s-ember-client" % Http4sVersion,
+      "org.http4s"      %% "http4s-circe"        % Http4sVersion,
+      "org.http4s"      %% "http4s-dsl"          % Http4sVersion,
+      "org.scalameta"   %% "munit"               % MunitVersion           % Test,
+      "org.typelevel"   %% "munit-cats-effect"   % MunitCatsEffectVersion % Test,
+      "ch.qos.logback"  %  "logback-classic"     % LogbackVersion         % Runtime,
+    )
   )
   .jsSettings(
     scalaJSUseMainModuleInitializer := true,

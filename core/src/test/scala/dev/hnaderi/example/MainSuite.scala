@@ -20,10 +20,11 @@ package accounts
 import cats.Id
 import edomata.munit.DomainSuite
 
+
 class DomainLogicSuite extends DomainSuite(msgId = "msg", address = "sut") {
   test("Test") {
-    AccountService[Id].expect(Command.Open, Account.New)(
-      Account.Open(0),
+    AccountService[Id].expect(Command.Open("categoryName"), Account.New("categoryName"))(
+      Account.Open("categoryName", 0),
       Notification.AccountOpened("sut")
     )
   }

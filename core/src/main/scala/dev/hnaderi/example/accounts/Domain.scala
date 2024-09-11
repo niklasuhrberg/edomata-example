@@ -20,8 +20,10 @@ import edomata.core.*
 import edomata.syntax.all.*
 import cats.implicits.*
 import cats.data.ValidatedNec
+import dev.hnaderi.example.accounts.Event.Opened_V1
 
 enum Event {
+  case Opened_V1(category: String)
   case Opened
   case Deposited(amount: BigDecimal)
   case Withdrawn(amount: BigDecimal)
@@ -38,13 +40,13 @@ enum Rejection {
 }
 
 enum Account {
-  case New
-  case Open(balance: BigDecimal)
+  case New(category: String)
+  case Open(category: String, balance: BigDecimal)
   case Close
 
-  def open: Decision[Rejection, Event, Open] = this
+  def open(category:String): Decision[Rejection, Event, Open] = this
     .decide {
-      case New => Decision.accept(Event.Opened)
+      case New(_) => Decision.accept(Event.Opened_V1(category))
       case _   => Decision.reject(Rejection.ExistingAccount)
     }
     .validate(_.mustBeOpen)
@@ -72,20 +74,26 @@ enum Account {
     .validate(_.mustBeOpen)
 
   private def mustBeOpen: ValidatedNec[Rejection, Open] = this match {
-    case o @ Open(_) => o.validNec
-    case New         => Rejection.NoSuchAccount.invalidNec
+    case o @ Open(_, _) => o.validNec
+    case New(_)         => Rejection.NoSuchAccount.invalidNec
     case Close       => Rejection.AlreadyClosed.invalidNec
   }
 }
 
 object Account extends DomainModel[Account, Event, Rejection] {
-  def initial = New
+  def initial = New("uninitialized")
   def transition = {
-    case Event.Opened => _ => Open(0).validNec
+    case Event.Opened_V1(category) => _ => Open(category = category, balance = BigDecimal.valueOf(0)).validNec
+    case Event.Opened => _ => Open(category = ( upcast(Event.Opened).asInstanceOf[Event.Opened_V1]).category, balance = BigDecimal.valueOf(0)).validNec
+
     case Event.Withdrawn(b) =>
       _.mustBeOpen.map(s => s.copy(balance = s.balance - b))
     case Event.Deposited(b) =>
       _.mustBeOpen.map(s => s.copy(balance = s.balance + b))
     case Event.Closed => _ => Close.validNec
+  }
+
+  def upcast(event: Event): Event = event match {
+    case Event.Opened => Opened_V1("default_category")
   }
 }

@@ -19,14 +19,14 @@ package dev.hnaderi.example
 import cats.effect.kernel.Async
 import cats.effect.std.Console
 import dev.hnaderi.example.accounts.AccountsApp
+import dev.hnaderi.example.metadata.MetadataApp
 import dev.hnaderi.example.orders.OrdersApp
 import fs2.io.net.Network
 import natchez.Trace.Implicits.noop
 import skunk.Session
 
 final case class Application[F[_]](
-    accounts: AccountsApp[F],
-    orders: OrdersApp[F]
+    metadataApp: MetadataApp[F]
 )
 
 object Application {
@@ -38,8 +38,6 @@ object Application {
       database = "postgres",
       max = 10
     )
-
-    accounts <- AccountsApp(pool)
-    orders <- OrdersApp(pool)
-  } yield new Application(accounts, orders)
+    metadata <- MetadataApp(pool)
+  } yield new Application(metadata)
 }
