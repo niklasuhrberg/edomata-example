@@ -23,7 +23,7 @@ object MetadataRoutes:
       case metadata.Rejection.IllegalState => PreconditionFailed("Metadata is not in a compatible state")
       case _ => InternalServerError("An error occurred")
     }
-  
+
   def metadataRoutes[F[_] : Async](M: MetadataApp[F[_]]): HttpRoutes[F] =
     val dsl = new Http4sDsl[F] {}
     import dsl.*
@@ -42,7 +42,7 @@ object MetadataRoutes:
         for {
           mc <- arg.as[MetadataCreation]
           creationResult <- M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
-            mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.category)))
+            mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category)))
           response <- creationResult.fold(
             rejection => processError[F](rejection.head),
             un => Ok("Metadata created"))

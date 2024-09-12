@@ -1,13 +1,12 @@
 package dev.hnaderi.example.metadata
 
-import dev.hnaderi.example.accounts.AccountService.App
 import dev.hnaderi.example.metadata.Command.{AddItem, Create}
 import dev.hnaderi.example.metadata.Notification.{ItemAdded, MetadataCreated}
 
 import java.util.UUID
 
 enum Command {
-  case Create(entityId: UUID, category: String)
+  case Create(entityId: UUID, parent: Option[UUID], category: String)
   case AddItem(item: MetadataItem)
 }
 
@@ -21,9 +20,9 @@ object MetadataService extends Metadata.Service[Command, Notification] {
   import cats.Monad
 
   def apply[F[_] : Monad]: App[F, Unit] = App.router {
-    case Create(entityId, category) => 
+    case Create(entityId, parent, category) => 
       for {
-        ns <- App.state.decide(_.create(entityId, category))
+        ns <- App.state.decide(_.create(entityId, parent, category))
         aggregateId <- App.aggregateId
         _ <- App.publish(MetadataCreated(UUID.fromString(aggregateId), entityId))
       } yield()

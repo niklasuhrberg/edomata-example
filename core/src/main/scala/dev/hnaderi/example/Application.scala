@@ -18,9 +18,7 @@ package dev.hnaderi.example
 
 import cats.effect.kernel.Async
 import cats.effect.std.Console
-import dev.hnaderi.example.accounts.AccountsApp
 import dev.hnaderi.example.metadata.MetadataApp
-import dev.hnaderi.example.orders.OrdersApp
 import fs2.io.net.Network
 import natchez.Trace.Implicits.noop
 import skunk.Session
