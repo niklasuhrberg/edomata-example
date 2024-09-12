@@ -26,7 +26,20 @@ object MetadataRoutes:
       case _ => InternalServerError("An error occurred")
     }
 
+  def validateParent[F[_] : Async : FlatMap](mc: MetadataCreation, M: MetadataApp[F]): F[EitherNec[Rejection, Unit]] =
+    mc.parent.fold(().rightNec.pure[F])(parentId =>
+      M.storage.repository.get(parentId.toString).map(m => m match {
+        case AggregateState.Valid(Metadata.Initialized(_, _, _, _), version) =>
+          ().rightNec
+        case AggregateState.Valid(Metadata.New, version) =>
+          Rejection.IllegalState.leftNec[Unit]
+        case AggregateState.Conflicted(last, _, _) =>
+          ().rightNec
+      }))
+
   def metadataRoutes[F[_] : Async : FlatMap](M: MetadataApp[F[_]]): HttpRoutes[F] =
+
+
     val dsl = new Http4sDsl[F] {}
     import dsl.*
     HttpRoutes.of[F] {
@@ -43,20 +56,11 @@ object MetadataRoutes:
       case arg@POST -> Root / "metadata" =>
         (for {
           mc <- EitherT[F, NonEmptyChain[Rejection], MetadataCreation](arg.as[MetadataCreation].map(m => m.asRight))
-          validationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](
-            mc.parent.fold(().rightNec.pure[F])(parentId =>
-              M.storage.repository.get(parentId.toString).map(m => m match {
-                case AggregateState.Valid(Metadata.Initialized(_,_,_,_), version) =>
-                  ().rightNec
-                case AggregateState.Valid(Metadata.New, version) =>
-                  Rejection.IllegalState.leftNec[Unit]
-                case AggregateState.Conflicted(last, _, _) =>
-                  ().rightNec
-              })))
+          validationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](validateParent[F](mc, M))
           creationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](
             M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
-            mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category))))
-          response <- EitherT[F, NonEmptyChain[Rejection], Response[F]](Ok("Metadata created").map(m => m.asRight))
+              mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category))))
+          response <- EitherT[F, NonEmptyChain[Rejection], Response[F]](Ok("Metadata created").map(_.asRight))
         } yield response).fold(r => InternalServerError("Try again"), a => a.pure[F]).flatten
 
       case arg@POST -> Root / "metadata" / id / "items" =>
