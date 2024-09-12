@@ -1,8 +1,10 @@
 package dev.hnaderi.example
 
-import cats.effect.{Async, IO, Sync}
+import cats.FlatMap
+import cats.data.*
+import cats.effect.Async
 import cats.syntax.all.*
-import dev.hnaderi.example.metadata.MetadataApp
+import dev.hnaderi.example.metadata.{MetadataApp, Rejection}
 import edomata.backend.eventsourcing.AggregateState
 import edomata.core.CommandMessage
 import io.circe.generic.auto.*
@@ -24,7 +26,7 @@ object MetadataRoutes:
       case _ => InternalServerError("An error occurred")
     }
 
-  def metadataRoutes[F[_] : Async](M: MetadataApp[F[_]]): HttpRoutes[F] =
+  def metadataRoutes[F[_] : Async : FlatMap](M: MetadataApp[F[_]]): HttpRoutes[F] =
     val dsl = new Http4sDsl[F] {}
     import dsl.*
     HttpRoutes.of[F] {
@@ -33,20 +35,20 @@ object MetadataRoutes:
           md <- M.storage.repository.get(id).map(m => m match {
             case AggregateState.Valid(state, version) =>
               state
-            case AggregateState.Conflicted(last, _ , _) => last
+            case AggregateState.Conflicted(last, _, _) => last
           })
           response <- Ok(md)
         } yield response
 
       case arg@POST -> Root / "metadata" =>
-        for {
-          mc <- arg.as[MetadataCreation]
-          creationResult <- M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
-            mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category)))
-          response <- creationResult.fold(
-            rejection => processError[F](rejection.head),
-            un => Ok("Metadata created"))
-        } yield response
+        (for {
+          mc <- EitherT[F, NonEmptyChain[Rejection], MetadataCreation](arg.as[MetadataCreation].map(m => m.asRight))
+          error <- EitherT[F, NonEmptyChain[Rejection], Unit](Rejection.IllegalState.leftNec[Unit].pure[F])
+          creationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
+            mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category))))
+          response <- EitherT[F, NonEmptyChain[Rejection], Response[F]](Ok("Metadata created").map(m => m.asRight))
+        } yield response).fold(r => InternalServerError("Try again"), a => a.pure[F]).flatten
+
       case arg@POST -> Root / "metadata" / id / "items" =>
         for {
           mc <- arg.as[MetadataItemCreation]
