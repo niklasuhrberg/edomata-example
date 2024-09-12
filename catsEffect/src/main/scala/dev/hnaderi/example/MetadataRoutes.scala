@@ -4,7 +4,7 @@ import cats.FlatMap
 import cats.data.*
 import cats.effect.Async
 import cats.syntax.all.*
-import dev.hnaderi.example.metadata.{MetadataApp, Rejection}
+import dev.hnaderi.example.metadata.{Metadata, MetadataApp, Rejection}
 import edomata.backend.eventsourcing.AggregateState
 import edomata.core.CommandMessage
 import io.circe.generic.auto.*
@@ -43,8 +43,18 @@ object MetadataRoutes:
       case arg@POST -> Root / "metadata" =>
         (for {
           mc <- EitherT[F, NonEmptyChain[Rejection], MetadataCreation](arg.as[MetadataCreation].map(m => m.asRight))
-          error <- EitherT[F, NonEmptyChain[Rejection], Unit](Rejection.IllegalState.leftNec[Unit].pure[F])
-          creationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
+          validationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](
+            mc.parent.fold(().rightNec.pure[F])(parentId =>
+              M.storage.repository.get(parentId.toString).map(m => m match {
+                case AggregateState.Valid(Metadata.Initialized(_,_,_,_), version) =>
+                  ().rightNec
+                case AggregateState.Valid(Metadata.New, version) =>
+                  Rejection.IllegalState.leftNec[Unit]
+                case AggregateState.Conflicted(last, _, _) =>
+                  ().rightNec
+              })))
+          creationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](
+            M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
             mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category))))
           response <- EitherT[F, NonEmptyChain[Rejection], Response[F]](Ok("Metadata created").map(m => m.asRight))
         } yield response).fold(r => InternalServerError("Try again"), a => a.pure[F]).flatten
