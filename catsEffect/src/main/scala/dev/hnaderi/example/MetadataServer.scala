@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.effect.std.Console
 import cats.syntax.all.*
 import com.comcast.ip4s.*
+import edomata.backend.OutboxConsumer
 import fs2.io.net.Network
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.server.EmberServerBuilder
@@ -16,7 +17,6 @@ object MetadataServer:
     for {
       client <- EmberClientBuilder.default[F].build
       metadataApp <- Application[F]()
-
       // Combine Service Routes into an HttpApp.
       // Can also be done via a Router if you
       // want to extract segments not checked

@@ -18,6 +18,7 @@ package dev.hnaderi.example
 
 import cats.effect.IO
 import cats.effect.IOApp
+import cats.effect.std.Console
 import edomata.core.CommandMessage
 
 import java.time.Instant
@@ -27,9 +28,12 @@ import java.time.Instant
 object Main extends IOApp.Simple {
 
   private val now = IO.realTime.map(d => Instant.EPOCH.plusNanos(d.toNanos))
-
+  
   import cats.effect.{IO, IOApp}
 
-  val run = MetadataServer.run[IO]
+  //val run = StreamLab2.run
+
+  val run = ReadSide.run[IO]
+  //val run = MetadataServer.run[IO]
 
 }
