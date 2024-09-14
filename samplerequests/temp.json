@@ -1,0 +1,24 @@
+{
+  "Initialized": {
+    "metadataId": "9337abac-a2cc-402d-95a8-776dd8e6a260",
+    "category": "isom-order",
+    "contents": [
+      {
+        "id": "c7b81ca5-eb94-47c5-8183-5b674622c9e5",
+        "name": "message",
+        "value": "Leveransklar",
+        "category": "message",
+        "parent": null,
+        "createdBy": "Kalle Svensson"
+      },
+      {
+        "id": "83541e9f-951c-43c5-a8f5-ca15458c0244",
+        "name": "message",
+        "value": "Leverans den 10/9",
+        "category": "message",
+        "parent": "c7b81ca5-eb94-47c5-8183-5b674622c9e5",
+        "createdBy": "Kalle Svensson"
+      }
+    ]
+  }
+}
