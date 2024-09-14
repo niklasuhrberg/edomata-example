@@ -20,7 +20,7 @@ ThisBuild / scalaVersion := "3.3.3"
 
 lazy val root = tlCrossRootProject.aggregate(domain, catsEffect, zio)
 
-lazy val domain = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+lazy val domain = crossProject(JVMPlatform) //, JSPlatform, NativePlatform
   .crossType(CrossType.Pure)
   .in(file("core"))
   .enablePlugins(NoPublishPlugin)
@@ -33,7 +33,7 @@ lazy val domain = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     )
   )
 
-lazy val catsEffect = crossProject(JVMPlatform, JSPlatform)
+lazy val catsEffect = crossProject(JVMPlatform) // , JSPlatform
   .crossType(CrossType.Pure)
   .dependsOn(domain)
   .enablePlugins(NoPublishPlugin)
@@ -50,10 +50,10 @@ lazy val catsEffect = crossProject(JVMPlatform, JSPlatform)
       "ch.qos.logback"  %  "logback-classic"     % LogbackVersion         % Runtime,
     )
   )
-  .jsSettings(
-    scalaJSUseMainModuleInitializer := true,
-    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
-  )
+//  .jsSettings(
+//    scalaJSUseMainModuleInitializer := true,
+//    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
+//  )
 
 lazy val zio = project
   .dependsOn(domain.jvm)

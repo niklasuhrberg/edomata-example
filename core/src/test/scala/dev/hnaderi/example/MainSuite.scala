@@ -18,14 +18,19 @@ package dev.hnaderi.example
 package accounts
 
 import cats.Id
+import dev.hnaderi.example.metadata.{Command, Metadata, MetadataService, Notification}
 import edomata.munit.DomainSuite
 
+import java.util.UUID
 
-class DomainLogicSuite extends DomainSuite(msgId = "msg", address = "sut") {
+
+class DomainLogicSuite extends DomainSuite(msgId = "msg", address = "20187a0d-703d-4f52-9915-3cb7fad57e8e") {
   test("Test") {
-    AccountService[Id].expect(Command.Open("categoryName"), Account.New("categoryName"))(
-      Account.Open("categoryName", 0),
-      Notification.AccountOpened("sut")
+    val entityId = UUID.randomUUID()
+    MetadataService[Id].expect(Command.Create(entityId, None, "categoryName"), Metadata.New)(
+      Metadata.Initialized(entityId, None, "categoryName", List.empty),
+      Notification.MetadataCreated(metadataId = UUID.fromString("20187a0d-703d-4f52-9915-3cb7fad57e8e"),
+        entityId = entityId)
     )
   }
 }

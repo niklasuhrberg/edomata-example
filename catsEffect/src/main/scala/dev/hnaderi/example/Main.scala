@@ -30,10 +30,7 @@ object Main extends IOApp.Simple {
   private val now = IO.realTime.map(d => Instant.EPOCH.plusNanos(d.toNanos))
   
   import cats.effect.{IO, IOApp}
-
-  //val run = StreamLab2.run
-
-  val run = ReadSide.run[IO]
-  //val run = MetadataServer.run[IO]
+  
+  val run = MetadataServer.run[IO]
 
 }
