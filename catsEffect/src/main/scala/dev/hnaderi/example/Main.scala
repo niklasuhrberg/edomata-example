@@ -32,5 +32,5 @@ object Main extends IOApp.Simple {
   import cats.effect.{IO, IOApp}
   
   val run = MetadataServer.run[IO]
-
+  val run = ReadSide.run[IO]
 }
