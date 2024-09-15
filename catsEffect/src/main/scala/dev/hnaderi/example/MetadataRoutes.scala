@@ -18,7 +18,7 @@ import java.util.UUID
 
 object MetadataRoutes:
 
-  def processError[F[_] : Async](arg: metadata.Rejection) =
+  private def processError[F[_] : Async](arg: metadata.Rejection) =
     val dsl = new Http4sDsl[F] {}
     import dsl.*
     arg match {
@@ -26,16 +26,16 @@ object MetadataRoutes:
       case _ => InternalServerError("An error occurred")
     }
 
-  def validateParent[F[_] : Async : FlatMap](mc: MetadataCreation, M: MetadataApp[F]): F[EitherNec[Rejection, Unit]] =
+  private def validateParent[F[_] : Async : FlatMap](mc: MetadataCreation, M: MetadataApp[F]): F[EitherNec[Rejection, Unit]] =
     mc.parent.fold(().rightNec.pure[F])(parentId =>
-      M.storage.repository.get(parentId.toString).map(m => m match {
+      M.storage.repository.get(parentId.toString).map {
         case AggregateState.Valid(Metadata.Initialized(_, _, _, _), version) =>
           ().rightNec
         case AggregateState.Valid(Metadata.New, version) =>
           Rejection.IllegalState.leftNec[Unit]
         case AggregateState.Conflicted(last, _, _) =>
           ().rightNec
-      }))
+      })
 
   def metadataRoutes[F[_] : Async : FlatMap](M: MetadataApp[F[_]]): HttpRoutes[F] =
 
@@ -45,11 +45,11 @@ object MetadataRoutes:
     HttpRoutes.of[F] {
       case GET -> Root / "metadata" / id =>
         for {
-          md <- M.storage.repository.get(id).map(m => m match {
+          md <- M.storage.repository.get(id).map {
             case AggregateState.Valid(state, version) =>
               state
             case AggregateState.Conflicted(last, _, _) => last
-          })
+          }
           response <- Ok(md)
         } yield response
 
@@ -69,7 +69,7 @@ object MetadataRoutes:
           creationResult <- M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
             id, metadata.Command.AddItem(DataConversion.itemCreationToItem(mc))))
           response <- creationResult.fold(rejection => processError[F](rejection.head), un => Ok("Metadata item created"))
-        } yield (response)
+        } yield response
     }
 
 
