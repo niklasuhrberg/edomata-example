@@ -16,20 +16,26 @@
 
 package dev.hnaderi.example
 
-import cats.effect.IO
-import cats.effect.IOApp
+import cats.effect.kernel.Async
 import cats.effect.std.Console
-import edomata.core.CommandMessage
+import dev.hnaderi.example.metadata.MetadataApp
+import fs2.io.net.Network
+import natchez.Trace.Implicits.noop
+import skunk.Session
 
-import java.time.Instant
+final case class ReadApplication[F[_]](
+    metadataApp: MetadataApp[F], processor: ReadModelOps[F]
+)
 
-
-
-object Main extends IOApp.Simple {
-
-  
-  import cats.effect.{IO, IOApp}
-  
-  //val run = MetadataServer.run[IO]
-  val run = ReadSide.run[IO]
+object ReadApplication {
+  def apply[F[_]: Async: Network: Console](processor: ReadModelOps[F]) = for {
+    pool <- Session.pooled[F](
+      host = "localhost",
+      user = "postgres",
+      password = Some("postgres"),
+      database = "postgres",
+      max = 10
+    )
+    metadata <- MetadataApp(pool)
+  } yield new ReadApplication(metadata, processor)
 }

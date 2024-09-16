@@ -12,10 +12,11 @@ import edomata.backend.EventMessage
 object ReadSide {
   def run[F[_]: Async: Console: Network: Concurrent]: F[Unit] = {
     val run0 = for {
-      app <- Stream.eval(Application[F]())
-      result <- app.metadataApp.storage.journal.readAll.printlns()
+      app <- Stream.resource(Application[F]())
+      processor = PrintReadModelOps[F]()
+      result <- app.metadataApp.storage.journal.readAll.foreach(e => processor.process(e.payload))
     } yield ()
     run0.compile.drain
-    ().pure
+    //().pure
   }
 }
