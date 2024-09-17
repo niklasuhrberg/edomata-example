@@ -20,9 +20,9 @@ createdBy: String,
 category: String)
 
 val codec: Codec[InsertMetadataRow] =
-  (uuid, uuid, uuid, varchar, varchar).tupled.imap {
-    case (id, entityId, parent, createdBy, category) => InsertMetadataRow(id, entityId, Option(parent),createdBy, category)
-  } { inr => (inr.id, inr.entityId, inr.parent.fold[UUID](UUID.randomUUID())(identity), inr.createdBy, inr.category) }
+  (uuid, uuid, uuid.opt, varchar, varchar).tupled.imap {
+    case (id, entityId, parent, createdBy, category) => InsertMetadataRow(id, entityId, parent,createdBy, category)
+  } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
 
 def insertCommand: Command[InsertMetadataRow] =
   sql"""
@@ -40,7 +40,6 @@ final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resour
       rowCount <- command.execute(ini)
       _ <- Console[F].println(s"Executed insert with rowcount $rowCount")
     } yield ())
-    //Console[F].println(event)
   }
 }
 
