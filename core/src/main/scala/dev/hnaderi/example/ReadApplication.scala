@@ -18,17 +18,17 @@ package dev.hnaderi.example
 
 import cats.effect.kernel.Async
 import cats.effect.std.Console
-import dev.hnaderi.example.metadata.MetadataApp
+import dev.hnaderi.example.metadata.{Event, MetadataApp}
 import fs2.io.net.Network
 import natchez.Trace.Implicits.noop
 import skunk.Session
 
 final case class ReadApplication[F[_]](
-    metadataApp: MetadataApp[F], processor: ReadModelOps[F]
+    metadataApp: MetadataApp[F], processor: ReadModelOps[F, Event]
 )
 
 object ReadApplication {
-  def apply[F[_]: Async: Network: Console](processor: ReadModelOps[F]) = for {
+  def apply[F[_]: Async: Network: Console](processor: ReadModelOps[F, Event]) = for {
     pool <- Session.pooled[F](
       host = "localhost",
       user = "postgres",

@@ -4,6 +4,7 @@ import cats.syntax.all.*
 import cats.effect.std.Console
 import cats.effect.{Async, Concurrent, Resource, Sync}
 import dev.hnaderi.example.metadata.Event
+import edomata.backend.EventMessage
 import skunk.{Codec, Command, Session}
 import skunk.implicits.sql
 import skunk.*
@@ -29,11 +30,12 @@ def insertCommand: Command[InsertMetadataRow] =
     INSERT INTO metadata VALUES($codec)
     """.command
 
-final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resource[F,Session[F]]) extends ReadModelOps[F] {
-  override def process(event: Event): F[Unit] = {
-    val ini: InsertMetadataRow = event match {
-      case Event.Created(entityId, parent, category) => InsertMetadataRow(UUID.randomUUID(), entityId,
-        None, "default", category)
+final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resource[F,Session[F]]) extends ReadModelOps[F, Event] {
+  override def process(event: EventMessage[Event]): F[Unit] = {
+
+    val ini: InsertMetadataRow = event.payload match {
+      case Event.Created(entityId, parent, category) => InsertMetadataRow(UUID.fromString(event.metadata.stream), entityId,
+        parent, "default", category)
     }
     pool.use(s => for {
       command <- s.prepare(insertCommand)
@@ -44,6 +46,6 @@ final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resour
 }
 
 object SkunkReadModelOps {
-  def apply[F[_]:Async: Sync: Console](pool: Resource[F, Session[F]]): F[SkunkReadModelOps[F]] =
+  def make[F[_]:Async: Sync: Console](pool: Resource[F, Session[F]]): F[SkunkReadModelOps[F]] =
     Sync[F].delay(new SkunkReadModelOps[F](pool))
 }

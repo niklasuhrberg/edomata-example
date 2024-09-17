@@ -1,6 +1,9 @@
 package dev.hnaderi.example
 
-trait ReadModelOps[F[_]] {
+import dev.hnaderi.example.metadata.Event
+import edomata.backend.EventMessage
 
-  def process(event: metadata.Event):F[Unit]
+trait ReadModelOps[F[_], T] {
+
+  def process(event: EventMessage[T]):F[Unit]
 }
