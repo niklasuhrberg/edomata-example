@@ -23,7 +23,7 @@ object ReadSide {
         max = 10
       ))
 
-      processor = new SkunkReadModelOps[F](pool)
+      processor <- Stream.eval(SkunkReadModelOps[F](pool))
       result <- app.metadataApp.storage.journal.readAll.foreach(e => processor.process(e.payload))
     } yield ()
     run0.compile.drain

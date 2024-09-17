@@ -2,7 +2,7 @@ package dev.hnaderi.example
 import cats.{Applicative, Monad}
 import cats.syntax.all.*
 import cats.effect.std.Console
-import cats.effect.{Async, Concurrent, Resource}
+import cats.effect.{Async, Concurrent, Resource, Sync}
 import dev.hnaderi.example.metadata.Event
 import skunk.{Codec, Command, Session}
 import skunk.implicits.sql
@@ -45,6 +45,6 @@ final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resour
 }
 
 object SkunkReadModelOps {
-  def apply[F[_]:Async: Console](pool: Resource[F, Session[F]]): SkunkReadModelOps[F] =
-    new SkunkReadModelOps[F](pool)
+  def apply[F[_]:Async: Sync: Console](pool: Resource[F, Session[F]]): F[SkunkReadModelOps[F]] =
+    Sync[F].delay(new SkunkReadModelOps[F](pool))
 }
