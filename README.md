@@ -11,6 +11,8 @@ In a different shell:
 
 ``` sh
 sbt catsEffectJVM/run
+
+Choose one of the two alternatives. Main for the webserver, ReadMain for the read model processor 
 ```
 
 ## Use the service
@@ -23,6 +25,11 @@ To create a metadata entity:
 `curl -v -X POST localhost:8080/metadata -d "@./samplerequests/metadata.json"`
 
 The `metadataId` must be new. 
+
+To create a metadata of the well known attachment category, that will be stored in a dedicated table 
+by the readside processor: 
+
+`curl -v -X POST localhost:8080/metadata -d "@./samplerequests/attachment.json"`
 
 To add a metadata entity point to another as its parent:
 `curl -X POST localhost:8080/metadata -d "@./samplerequests/metadatap.json"`
