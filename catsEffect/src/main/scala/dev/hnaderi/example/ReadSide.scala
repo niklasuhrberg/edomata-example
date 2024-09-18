@@ -13,7 +13,7 @@ import natchez.Trace.Implicits.noop
 import skunk.Session
 object ReadSide {
   def run[F[_]: Async: Console: Network: Concurrent]: F[Unit] = {
-    val run0 = for {
+    (for {
       app <- Stream.resource(Application[F]())
       pool <- Stream.resource(Session.pooled[F](
         host = "localhost",
@@ -24,8 +24,6 @@ object ReadSide {
       ))
       processor <- Stream.eval(SkunkReadModelOps.make[F](pool))
       result <- app.metadataApp.storage.journal.readAll.foreach(e => processor.process(e))
-    } yield ()
-    run0.compile.drain
-    //().pure
+    } yield()).compile.drain
   }
 }
