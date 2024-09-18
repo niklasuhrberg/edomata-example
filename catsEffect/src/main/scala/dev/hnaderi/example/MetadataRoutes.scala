@@ -4,7 +4,7 @@ import cats.FlatMap
 import cats.data.*
 import cats.effect.Async
 import cats.syntax.all.*
-import dev.hnaderi.example.metadata.{Metadata, MetadataApp, Rejection}
+import dev.hnaderi.example.metadata.{Metadata, MetadataApp, MetadataItem, Rejection}
 import edomata.backend.eventsourcing.AggregateState
 import edomata.core.CommandMessage
 import io.circe.generic.auto.*
@@ -59,7 +59,8 @@ object MetadataRoutes:
           validationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](validateParent[F](mc, M))
           creationResult <- EitherT[F, NonEmptyChain[Rejection], Unit](
             M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
-              mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category))))
+              mc.metadataId.toString, metadata.Command.Create(mc.entityId, mc.parent, mc.category, "default user",
+                mc.items.map(ic => DataConversion.itemCreationToItem(ic))))))
           response <- EitherT[F, NonEmptyChain[Rejection], Response[F]](Ok("Metadata created").map(_.asRight))
         } yield response).fold(r => InternalServerError("Try again"), a => a.pure[F]).flatten
 
@@ -67,7 +68,7 @@ object MetadataRoutes:
         for {
           mc <- arg.as[MetadataItemCreation]
           creationResult <- M.service(CommandMessage(UUID.randomUUID().toString, Instant.now(),
-            id, metadata.Command.AddItem(DataConversion.itemCreationToItem(mc))))
+            id, metadata.Command.AddItem(DataConversion.itemCreationToItem(mc), "default user")))
           response <- creationResult.fold(rejection => processError[F](rejection.head), un => Ok("Metadata item created"))
         } yield response
     }

@@ -8,11 +8,11 @@ import edomata.syntax.all.*
 
 import java.util.UUID
 
-case class MetadataItem(id: UUID, name: String, value: String, category: String, parent: Option[UUID], createdBy: String)
+case class MetadataItem(id: UUID, name: String, value: String)
 
 enum Event {
-  case Created(entityId: UUID, parent: Option[UUID], category: String)
-  case ItemAdded(item: MetadataItem)
+  case Created(entityId: UUID, parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
+  case ItemAdded(item: MetadataItem, user:String)
 }
 
 enum Rejection {
@@ -25,14 +25,14 @@ enum Metadata {
   case New
 
 
-  def create(entityId: UUID, parent: Option[UUID], category: String): Decision[Rejection, Event, Metadata] = this.decide {
-    case New => Decision.accept(Event.Created(entityId, parent, category))
+  def create(entityId: UUID, parent: Option[UUID], category: String, user: String, items: List[MetadataItem]): Decision[Rejection, Event, Metadata] = this.decide {
+    case New => Decision.accept(Event.Created(entityId, parent, category, user, items))
     case _ => Decision.reject(Rejection.IllegalState)
   }
 
-  def addItem(item: MetadataItem): Decision[Rejection, Event, Metadata] = this.decide {
+  def addItem(item: MetadataItem, user: String): Decision[Rejection, Event, Metadata] = this.decide {
     case New => Decision.reject(Rejection.IllegalState)
-    case Initialized(_, _, _,_) => Decision.accept(Event.ItemAdded(item))
+    case Initialized(_, _, _,_) => Decision.accept(Event.ItemAdded(item, user))
   }
 
   private def mustBeNew: ValidatedNec[Rejection, Metadata] = this match {
@@ -50,12 +50,12 @@ object Metadata extends DomainModel[Metadata, Event, Rejection] {
   def initial = New
 
   def transition = {
-    case Event.ItemAdded(item) => _.mustBeInitialized.map(i => i.copy(contents = i.contents.appended(item)))
-    case Event.Created(metadataId, parent,category) => _.mustBeNew.map(n =>
+    case Event.ItemAdded(item, user) => _.mustBeInitialized.map(i => i.copy(contents = i.contents.appended(item)))
+    case Event.Created(metadataId, parent,category, user, items) => _.mustBeNew.map(n =>
       Initialized(entityId = metadataId,
         parent = parent,
       category = category,
-        contents = List.empty))
+        contents = items))
     }
 }
 

@@ -34,8 +34,8 @@ final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resour
   override def process(event: EventMessage[Event]): F[Unit] = {
 
     val ini: InsertMetadataRow = event.payload match {
-      case Event.Created(entityId, parent, category) => InsertMetadataRow(UUID.fromString(event.metadata.stream), entityId,
-        parent, "default", category)
+      case Event.Created(entityId, parent, category, user, _) => InsertMetadataRow(UUID.fromString(event.metadata.stream), entityId,
+        parent, user, category)
     }
     pool.use(s => for {
       command <- s.prepare(insertCommand)

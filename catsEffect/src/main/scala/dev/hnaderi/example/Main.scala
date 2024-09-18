@@ -27,9 +27,9 @@ import java.time.Instant
 
 object Main extends IOApp.Simple {
 
-  
+
   import cats.effect.{IO, IOApp}
   
-  //val run = MetadataServer.run[IO]
-  val run = ReadSide.run[IO]
+  val run = MetadataServer.run[IO]
+  //val run = ReadSide.run[IO]
 }
