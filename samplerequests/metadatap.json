@@ -1,6 +1,17 @@
 {
-  "category": "message",
+  "category": "planner",
   "metadataId": "20187a0d-703d-4f52-9915-3cb7fad57e8e",
   "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
-  "parent": "80ad3bcc-b296-46ce-bd8c-f1d7559f36b2"
+  "parent": "432ffb18-7645-487c-9804-4554b1ee8154",
+  "createdBy": "niuhr2",
+  "items": [
+    {
+      "name":  "name",
+      "value": "kitchendrawing 3"
+    },
+    {
+      "name": "fileExtension",
+      "value": "pdf"
+    }
+  ]
 }

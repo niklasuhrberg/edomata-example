@@ -7,14 +7,14 @@ object ReadSide2 {
     import fs2.Stream.*
     import scala.concurrent.duration.*
 
-    val consumer = for {
-      offset <- eval(IO.ref(-1l))
-      _ <- app.metadataApp.storage.updates.journal
-      current <- eval(offset.get)
-      event <- app.metadataApp.storage.journal.readAllAfter(current)
-      _ <- eval(IO.println(s"Consumer: $event"))
-      _ <- exec(offset.set(event.metadata.seqNr))
-    } yield ()
+//    val consumer = for {
+//      offset <- eval(IO.ref(-1l))
+//      _ <- app.metadataApp.storage.updates.journal
+//      current <- eval(offset.get)
+//      event <- app.metadataApp.storage.journal.readAllAfter(current)
+//      _ <- eval(IO.println(s"Consumer: $event"))
+//      _ <- exec(offset.set(event.metadata.seqNr))
+//    } yield ()
 
     val consumerDistributed = for {
       offset <- eval(IO.ref(-1l))
