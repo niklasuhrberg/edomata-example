@@ -18,13 +18,13 @@ object ReadSide2 {
 
     val consumerDistributed = for {
       offset <- eval(IO.ref(-1l))
-      _ <- awakeEvery[IO](10.seconds)
+      _ <- awakeEvery[IO](500.millis)
       current <- eval(offset.get)
       event <- app.metadataApp.storage.journal.readAllAfter(current)
       _ <- eval(IO.println(s"ConsumerDistributed: $event"))
       _ <- exec(offset.set(event.metadata.seqNr))
     } yield ()
 
-    consumer.concurrently(consumerDistributed).compile.drain
+    consumerDistributed.compile.drain
   )
 }

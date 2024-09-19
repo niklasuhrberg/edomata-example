@@ -11,7 +11,6 @@ import skunk.implicits.sql
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
-import fs2.Compiler.Target.forConcurrent
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
 import dev.hnaderi.example.metadata.MetadataItem
@@ -67,11 +66,11 @@ def insertAttachmentCommand: Command[InsertAttachmentRow] =
     INSERT INTO attachments VALUES($attachemtCodec)
     """.command
 def filterItem(items: List[MetadataItem], arg: String):String = items.find(_.name == arg).map(_.value).get
-def itemsToAttachment(eventMessage: EventMessage[Event]) = {
+def itemsToAttachment(eventMessage: EventMessage[Event]): InsertAttachmentRow = {
   val c = eventMessage.payload.asInstanceOf[Event.Created]
   InsertAttachmentRow(
     id = UUID.fromString(eventMessage.metadata.stream),
-    status = filterItem(c.items, "status" ),
+    status = filterItem(c.items, "status"),
     name = filterItem(c.items, "name"),
     fileExtension = filterItem(c.items, "fileExtension"),
     description = filterItem(c.items, "description"),
@@ -81,6 +80,21 @@ def itemsToAttachment(eventMessage: EventMessage[Event]) = {
     createdAt = Instant.now()
   )
 }
+def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
+  val c = eventMessage.payload.asInstanceOf[Event.Created]
+  InsertMetadataRow(UUID.fromString(eventMessage.metadata.stream), c.entityId,
+    c.parent, c.user, c.category)
+}
+
+  def processAttachment[F[_]:Monad: Console](s: Session[F], event: EventMessage[Event]): F[Unit] = for {
+  command <- s.prepare(insertAttachmentCommand)
+  rowCount <- command.execute(itemsToAttachment(event))
+} yield ()
+def processMetadata[F[_] : Monad : Console](s: Session[F], event: EventMessage[Event]): F[Unit] = for {
+  command <- s.prepare(insertCommand)
+  rowCount <- command.execute(itemsToMetadata(event))
+} yield ()
+
 
 final case class SkunkReadModelOps[F[_]:Monad: Concurrent: Console](pool: Resource[F,Session[F]]) extends ReadModelOps[F, Event] {
   override def process(event: EventMessage[Event]): F[Unit] = {
