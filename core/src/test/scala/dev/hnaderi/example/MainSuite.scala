@@ -18,7 +18,7 @@ package dev.hnaderi.example
 package accounts
 
 import cats.Id
-import dev.hnaderi.example.metadata.{Command, Metadata, MetadataItem, MetadataService, Notification}
+import dev.hnaderi.example.metadata.{Command, Metadata, MetadataItem, MetadataService, Notification, Rejection}
 import edomata.munit.DomainSuite
 
 import java.util.UUID
@@ -32,6 +32,14 @@ class DomainLogicSuite extends DomainSuite(msgId = "msg", address = "20187a0d-70
       Metadata.Initialized(entityId, None, "categoryName", List(item)),
       Notification.MetadataCreated(metadataId = UUID.fromString("20187a0d-703d-4f52-9915-3cb7fad57e8e"),
         entityId = entityId)
+    )
+  }
+
+  test("Add item fails when new") {
+    val entityId = UUID.randomUUID()
+    val item = MetadataItem(UUID.randomUUID(), "filename", "Kitchen Measurements")
+    MetadataService[Id].expectRejectionWith(Command.AddItem(item, "default user"), Metadata.New)(
+      Rejection.IllegalState
     )
   }
 }

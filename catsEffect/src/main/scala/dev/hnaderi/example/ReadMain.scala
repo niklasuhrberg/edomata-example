@@ -28,5 +28,5 @@ object ReadMain extends IOApp.Simple {
 
   import cats.effect.{IO, IOApp}
   
-  val run = ReadSide.run[IO]
+  val run = ReadSide2.run
 }

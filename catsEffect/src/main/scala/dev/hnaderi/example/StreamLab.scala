@@ -3,9 +3,8 @@ package dev.hnaderi.example
 import cats.effect.Async
 import cats.effect.std.Console
 import cats.syntax.*
-import cats.instances.*
-import fs2.io.net.Network
 import cats.syntax.all.*
+import fs2.io.net.Network
 
 object StreamLab {
 

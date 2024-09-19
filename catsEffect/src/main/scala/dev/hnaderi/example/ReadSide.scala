@@ -1,12 +1,8 @@
 package dev.hnaderi.example
 
+import cats.effect.Async
 import cats.effect.kernel.Concurrent
 import cats.effect.std.Console
-import cats.effect.{Async, IO, Resource}
-import cats.implicits.*
-import cats.syntax.all.*
-import dev.hnaderi.example.metadata.Event
-import edomata.backend.EventMessage
 import fs2.Stream
 import fs2.io.net.Network
 import natchez.Trace.Implicits.noop
