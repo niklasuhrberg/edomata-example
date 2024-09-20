@@ -189,10 +189,13 @@ def processMetadata[F[_]: Monad: Console](
     s: Session[F],
     event: EventMessage[Event]
 ): F[Unit] = for {
+  m <- itemsToMetadata(event).pure
   command <- s.prepare(insertCommand)
-  rowCount <- command.execute(itemsToMetadata(event))
+  rowCount <- command.execute(m)
   r <- event.payload.asInstanceOf[Created].items.traverse(i => processItem[F](s, i,
     UUID.fromString(event.metadata.stream)))
+  auditCommand <- s.prepare(insertAuditCommand)
+  a <- auditCommand.execute(InsertAuditRow(UUID.randomUUID(), m.id, "Created metadata", "default user", Instant.now()))
 //  itemCommand <- s.prepare(insertItemCommand)
 //  r <- event.payload.asInstanceOf[Created].items.map(i =>
 //    itemCommand.execute(itemToRow(UUID.fromString(event.metadata.stream), i))).reduce((l,r) => l)
