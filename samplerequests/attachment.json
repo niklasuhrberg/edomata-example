@@ -1,6 +1,6 @@
 {
   "category": "attachment",
-  "metadataId": "3d6eea82-aaac-40e3-b2f3-d9d6ebeddaa2",
+  "metadataId": "3d6eea82-aaac-40e3-b2f3-d9d6ebeddaa6",
   "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
   "createdBy": "niuhr2",
   "items": [
@@ -14,7 +14,7 @@
     },
     {
       "name": "status",
-      "value": "PREIMINARY"
+      "value": "PRELIMINARY"
     },
     {
       "name": "description",

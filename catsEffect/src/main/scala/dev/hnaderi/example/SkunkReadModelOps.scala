@@ -15,6 +15,13 @@ import skunk.data.Completion
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
 
+case class InsertAuditRow(
+    id: UUID,
+    metadataId: UUID,
+    action: String,
+    username: String,
+    time: Instant
+                         )
 case class InsertMetadataRow(
     id: UUID,
     entityId: UUID,
@@ -42,17 +49,6 @@ case class InsertItemRow(
                           name: String,
                           value: String)
 
-
-
-//id uuid
-//status varchar
-//name varchar
-//fileExtension varchar
-//description varchar
-//content_type varchar
-//location varchar
-//version integer DEFAULT 0
-//created_at timestamptz not DEFAULT CURRENT_TIMESTAMP
 
 val attachemtCodec: Codec[InsertAttachmentRow] =
   (
@@ -112,19 +108,32 @@ val itemCodec: Codec[InsertItemRow] =
     case (id, metadataId, name, value) => InsertItemRow(id, metadataId, name, value)
   } { item => (item.id, item.metadataId, item.name, item.value)}
 
+val auditCodec: Codec[InsertAuditRow] =
+  (uuid, uuid, varchar, varchar, timestamptz).tupled.imap {
+case (id, metadataId, action, username, time) => InsertAuditRow(id, metadataId, action, username, time.toInstant)
+  } {
+    a => (a.id, a.metadataId, a.action, a.username, OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault()))
+  }
+
 def insertCommand: Command[InsertMetadataRow] =
   sql"""
     INSERT INTO metadata VALUES($codec)
     """.command
 def insertItemCommand: Command[InsertItemRow] =
   sql"""
-       INSERT INTO items ('id','metadata_id','name','value',) VALUES($itemCodec)
+       INSERT INTO items (id, metadata_id, name, value) VALUES($itemCodec)
      """.command
 
 def insertAttachmentCommand: Command[InsertAttachmentRow] =
   sql"""
     INSERT INTO attachments VALUES($attachemtCodec)
     """.command
+
+def insertAuditCommand: Command[InsertAuditRow] =
+sql"""
+     INSERT INTO audit (id, metadata_id, action, username, time) VALUES ($auditCodec)
+   """.command
+
 def filterItem(items: List[MetadataItem], arg: String): String =
   items.find(_.name == arg).map(_.value).get
 def itemsToAttachment(
@@ -163,8 +172,11 @@ def processAttachment[F[_]: Monad: Console](
     s: Session[F],
     event: EventMessage[Event]
 ): F[Unit] = for {
+  insertAttachment <- itemsToAttachment(event).pure
   command <- s.prepare(insertAttachmentCommand)
   rowCount <- command.execute(itemsToAttachment(event))
+  auditCommand <- s.prepare(insertAuditCommand)
+  rowCountAudit <- auditCommand.execute(InsertAuditRow(UUID.randomUUID(), insertAttachment.id, "Create attachment", "default user", Instant.now()))
 } yield ()
 
 def processItem[F[_]:Monad:Console] (

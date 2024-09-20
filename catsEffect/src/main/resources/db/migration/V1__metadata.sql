@@ -28,3 +28,11 @@ create table attachments
     version       integer                   DEFAULT 0,
     created_at    timestamptz      not null DEFAULT CURRENT_TIMESTAMP
 );
+
+create table audit (
+    id uuid primary key not null,
+    metadata_id uuid not null ,
+    action varchar not null,
+    username varchar not null,
+    time timestamptz not null DEFAULT CURRENT_TIMESTAMP
+);
