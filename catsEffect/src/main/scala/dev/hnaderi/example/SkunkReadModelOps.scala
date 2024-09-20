@@ -108,9 +108,9 @@ val codec: Codec[InsertMetadataRow] =
       InsertMetadataRow(id, entityId, parent, createdBy, category)
   } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
 val itemCodec: Codec[InsertItemRow] =
-  (uuid, varchar, varchar, uuid).tupled.imap {
-    case (metadataId, name, value, id) => InsertItemRow(id, metadataId, name, value)
-  } { item => (item.metadataId, item.name, item.value, item.id)}
+  (uuid, uuid, varchar, varchar).tupled.imap {
+    case (id, metadataId, name, value) => InsertItemRow(id, metadataId, name, value)
+  } { item => (item.id, item.metadataId, item.name, item.value)}
 
 def insertCommand: Command[InsertMetadataRow] =
   sql"""
@@ -118,7 +118,7 @@ def insertCommand: Command[InsertMetadataRow] =
     """.command
 def insertItemCommand: Command[InsertItemRow] =
   sql"""
-       INSERT INTO items VALUES($itemCodec)
+       INSERT INTO items ('id','metadata_id','name','value',) VALUES($itemCodec)
      """.command
 
 def insertAttachmentCommand: Command[InsertAttachmentRow] =
@@ -171,7 +171,7 @@ def processItem[F[_]:Monad:Console] (
     s:Session[F], item: MetadataItem, metadataId: UUID
                                    ):F[Completion] = for {
     itemCommand <- s.prepare(insertItemCommand)
-    r <- itemCommand.execute(itemToRow(metadataId, item))  
+    r <- itemCommand.execute(itemToRow(metadataId, item))
 } yield r
 def processMetadata[F[_]: Monad: Console](
     s: Session[F],

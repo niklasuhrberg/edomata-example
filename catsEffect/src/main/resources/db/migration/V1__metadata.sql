@@ -11,10 +11,10 @@ create table metadata (
 );
 create table items (
                           id uuid primary key not null,
-                          entity_id uuid not null,
+                          metadata_id uuid not null,
                           name varchar not null,
                           value varchar not null,
-    constraint fk_items_metadata foreign key (entity_id) references metadata(id) on delete cascade
+    constraint fk_items_metadata foreign key (metadata_id) references metadata(id) on delete cascade
 );
 create table attachments
 (
