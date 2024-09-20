@@ -1,19 +1,19 @@
 package dev.hnaderi.example
-import cats.{Applicative, Monad}
-import cats.syntax.all.*
+import cats.Monad
 import cats.effect.std.Console
 import cats.effect.{Async, Concurrent, Resource, Sync}
-import dev.hnaderi.example.metadata.Event
+import cats.syntax.all.*
 import dev.hnaderi.example.metadata.Event.Created
+import dev.hnaderi.example.metadata.{Event, MetadataItem}
 import edomata.backend.EventMessage
-import skunk.{Codec, Command, Session}
-import skunk.implicits.sql
-import skunk.*
 import skunk.codec.all.*
+import skunk.implicits.sql
 import skunk.syntax.all.*
+import skunk.*
+import skunk.data.Completion
+
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
-import dev.hnaderi.example.metadata.MetadataItem
 
 case class InsertMetadataRow(
     id: UUID,
@@ -22,6 +22,7 @@ case class InsertMetadataRow(
     createdBy: String,
     category: String
 )
+
 
 case class InsertAttachmentRow(
     id: UUID,
@@ -34,6 +35,14 @@ case class InsertAttachmentRow(
     version: Int,
     createdAt: Instant
 )
+
+case class InsertItemRow(
+                          id: UUID,
+                          metadataId: UUID,
+                          name: String,
+                          value: String)
+
+
 
 //id uuid
 //status varchar
@@ -98,11 +107,19 @@ val codec: Codec[InsertMetadataRow] =
     case (id, entityId, parent, createdBy, category) =>
       InsertMetadataRow(id, entityId, parent, createdBy, category)
   } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
+val itemCodec: Codec[InsertItemRow] =
+  (uuid, varchar, varchar, uuid).tupled.imap {
+    case (metadataId, name, value, id) => InsertItemRow(id, metadataId, name, value)
+  } { item => (item.metadataId, item.name, item.value, item.id)}
 
 def insertCommand: Command[InsertMetadataRow] =
   sql"""
     INSERT INTO metadata VALUES($codec)
     """.command
+def insertItemCommand: Command[InsertItemRow] =
+  sql"""
+       INSERT INTO items VALUES($itemCodec)
+     """.command
 
 def insertAttachmentCommand: Command[InsertAttachmentRow] =
   sql"""
@@ -136,7 +153,12 @@ def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
     c.category
   )
 }
-
+def itemToRow(metadataId:UUID, metadataItem: MetadataItem): InsertItemRow = InsertItemRow(
+  metadataItem.id,
+  metadataId,
+  metadataItem.name,
+  metadataItem.value
+)
 def processAttachment[F[_]: Monad: Console](
     s: Session[F],
     event: EventMessage[Event]
@@ -144,27 +166,30 @@ def processAttachment[F[_]: Monad: Console](
   command <- s.prepare(insertAttachmentCommand)
   rowCount <- command.execute(itemsToAttachment(event))
 } yield ()
+
+def processItem[F[_]:Monad:Console] (
+    s:Session[F], item: MetadataItem, metadataId: UUID
+                                   ):F[Completion] = for {
+    itemCommand <- s.prepare(insertItemCommand)
+    r <- itemCommand.execute(itemToRow(metadataId, item))  
+} yield r
 def processMetadata[F[_]: Monad: Console](
     s: Session[F],
     event: EventMessage[Event]
 ): F[Unit] = for {
   command <- s.prepare(insertCommand)
   rowCount <- command.execute(itemsToMetadata(event))
+  r <- event.payload.asInstanceOf[Created].items.traverse(i => processItem[F](s, i,
+    UUID.fromString(event.metadata.stream)))
+//  itemCommand <- s.prepare(insertItemCommand)
+//  r <- event.payload.asInstanceOf[Created].items.map(i =>
+//    itemCommand.execute(itemToRow(UUID.fromString(event.metadata.stream), i))).reduce((l,r) => l)
 } yield ()
 
 final case class SkunkReadModelOps[F[_]: Monad: Concurrent: Console](
     pool: Resource[F, Session[F]]
 ) extends ReadModelOps[F, Event] {
   override def process(event: EventMessage[Event]): F[Unit] = {
-//    val a: InsertAttachmentRow = event.payload match {
-//      case Event.Created(entityId, parent, category, user, items) =>
-//        itemsToAttachment(event)
-//    }
-//    val ini: InsertMetadataRow = event.payload match {
-//      case Event.Created(entityId, parent, category, user, _) => InsertMetadataRow(UUID.fromString(event.metadata.stream), entityId,
-//        parent, user, category)
-//    }
-
     pool.use(s =>
       event.payload match {
         case Created(_, _, "attachment", _, _) => processAttachment(s, event)

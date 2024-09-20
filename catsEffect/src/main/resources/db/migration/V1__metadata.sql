@@ -10,6 +10,7 @@ create table metadata (
   category varchar not null
 );
 create table items (
+                          id uuid primary key not null,
                           entity_id uuid not null,
                           name varchar not null,
                           value varchar not null,

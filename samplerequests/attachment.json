@@ -5,7 +5,7 @@
   "createdBy": "niuhr2",
   "items": [
     {
-      "name":  "name",
+      "name": "name",
       "value": "bedroomdrawing2"
     },
     {
@@ -13,21 +13,20 @@
       "value": "pdf"
     },
     {
-      "name":  "status",
+      "name": "status",
       "value": "PREIMINARY"
     },
     {
-      "name":  "description",
+      "name": "description",
       "value": "Nice bedroom 2"
     },
     {
-      "name":  "contentType",
+      "name": "contentType",
       "value": "application/pdf"
     },
     {
-      "name":  "location",
+      "name": "location",
       "value": "2ed9c02d-96cd-4c34-9c37-05597221a48f"
     }
   ]
 }
-
