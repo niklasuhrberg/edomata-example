@@ -1,0 +1,2 @@
+insert into entitytypes (id, description) values ('ISOM_ORDER', 'Sales order');
+insert into entitytypes (id, description) values ('OFFERING', 'Offering thay might result in one or multiple sales orders');

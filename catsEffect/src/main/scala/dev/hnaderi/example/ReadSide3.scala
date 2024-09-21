@@ -24,7 +24,7 @@ object ReadSide3 {
         max = 10
       ))
       processor <- Stream.eval(SkunkReadModelOps.make[F](pool))
-      offset <- Stream.eval(Concurrent[F].ref[Long](176662))
+      offset <- Stream.eval(Concurrent[F].ref[Long](1498520))
       _ <- awakeEvery[F](500.millis)
       current <- eval(offset.get)
       event <- app.metadataApp.storage.journal.readAllAfter(current)//.foreach(e => processor.process(e))

@@ -1,0 +1,7 @@
+curl localhost:8080/metadata/545cd890-b407-480c-a72c-a67227ad5260
+
+curl -X POST localhost:8080/metadata -d "@./samplerequests/attachment.json"
+
+curl -X POST localhost:8080/metadata -d "@./samplerequests/metadata.json"
+
+curl -X POST localhost:8080/metadata/id/items -d "@./samplerequests/item.json"
