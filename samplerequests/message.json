@@ -1,0 +1,24 @@
+{
+  "category": "message",
+  "metadataId": "0aa412ac-d220-461b-97e3-239d8512ac81",
+  "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
+  "createdBy": "niuhr2",
+  "items": [
+    {
+      "name": "subject",
+      "value": "Delivery note"
+    },
+    {
+      "name": "content",
+      "value": "The delivery is on time"
+    },
+    {
+      "name": "audience",
+      "value": "DELIVERY SP"
+    },
+    {
+      "name": "systemOrigin",
+      "value": "SALJA"
+    }
+  ]
+}

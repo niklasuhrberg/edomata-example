@@ -68,13 +68,12 @@ create table audit
 create table messages
 (
     id            uuid primary key not null,
-    entity_id     uuid             not null,
     predecessor   uuid,
     seq_nr        integer          not null,
     subject       varchar,
     content       varchar          not null,
-    audience      varchar,
-    username      varchar,
+    audience      varchar          not null,
+    username      varchar          not null,
     sys_id_origin varchar,
     created_at    timestamptz DEFAULT CURRENT_TIMESTAMP
 );
@@ -82,6 +81,6 @@ create table messages_entities
 (
     message_id uuid not null,
     entity_id  uuid not null,
-    constraint fk_message_entity foreign key (entity_id) references entities(id),
-    constraint fk_message_message foreign key (message_id) references messages(id)
+    constraint fk_message_entity foreign key (entity_id) references entities (id),
+    constraint fk_message_message foreign key (message_id) references messages (id)
 );

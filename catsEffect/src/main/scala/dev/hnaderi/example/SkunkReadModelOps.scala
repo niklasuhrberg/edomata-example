@@ -15,13 +15,25 @@ import skunk.data.Completion
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
 
+case class InsertMessageRow(
+    id: UUID,
+    predecessor: Option[UUID],
+    sequenceNumber: Int,
+    subject: Option[String],
+    content: String,
+    audience: String,
+    createdBy: String,
+    systemOrigin: String,
+    createdAt: Instant
+)
+
 case class InsertAuditRow(
     id: UUID,
     metadataId: UUID,
     action: String,
     username: String,
     time: Instant
-                         )
+)
 case class InsertMetadataRow(
     id: UUID,
     entityId: UUID,
@@ -29,7 +41,6 @@ case class InsertMetadataRow(
     createdBy: String,
     category: String
 )
-
 
 case class InsertAttachmentRow(
     id: UUID,
@@ -44,11 +55,70 @@ case class InsertAttachmentRow(
 )
 
 case class InsertItemRow(
-                          id: UUID,
-                          metadataId: UUID,
-                          name: String,
-                          value: String)
+    id: UUID,
+    metadataId: UUID,
+    name: String,
+    value: String
+)
 
+/*
+    id            uuid primary key not null,
+    predecessor   uuid,
+    seq_nr        integer          not null,
+    subject       varchar,
+    content       varchar          not null,
+    audience      varchar,
+    username      varchar,
+    sys_id_origin varchar,
+    created_at    timestamptz DEFAULT CURRENT_TIMESTAMP
+ */
+val messageCodec: Codec[InsertMessageRow] =
+  (
+    uuid,
+    uuid.opt,
+    int4,
+    varchar.opt,
+    varchar,
+    varchar,
+    varchar,
+    varchar,
+    timestamptz
+  ).tupled.imap {
+    case (
+          id,
+          predecessor,
+          sequenceNumber,
+          subject,
+          content,
+          audience,
+          createdBy,
+          systemOrigin,
+          createdAt
+        ) =>
+      InsertMessageRow(
+        id = id,
+        predecessor = predecessor,
+        sequenceNumber = sequenceNumber,
+        subject = subject,
+        content = content,
+        audience = audience,
+        createdBy = createdBy,
+        systemOrigin = systemOrigin,
+        createdAt = createdAt.toInstant()
+      )
+  } { m =>
+    (
+      m.id,
+      m.predecessor,
+      m.sequenceNumber,
+      m.subject,
+      m.content,
+      m.audience,
+      m.createdBy,
+      m.systemOrigin,
+      OffsetDateTime.ofInstant(m.createdAt, ZoneId.systemDefault())
+    )
+  }
 
 val attachemtCodec: Codec[InsertAttachmentRow] =
   (
@@ -105,16 +175,39 @@ val codec: Codec[InsertMetadataRow] =
   } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
 val itemCodec: Codec[InsertItemRow] =
   (uuid, uuid, varchar, varchar).tupled.imap {
-    case (id, metadataId, name, value) => InsertItemRow(id, metadataId, name, value)
-  } { item => (item.id, item.metadataId, item.name, item.value)}
+    case (id, metadataId, name, value) =>
+      InsertItemRow(id, metadataId, name, value)
+  } { item => (item.id, item.metadataId, item.name, item.value) }
 
 val auditCodec: Codec[InsertAuditRow] =
   (uuid, uuid, varchar, varchar, timestamptz).tupled.imap {
-case (id, metadataId, action, username, time) => InsertAuditRow(id, metadataId, action, username, time.toInstant)
-  } {
-    a => (a.id, a.metadataId, a.action, a.username, OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault()))
+    case (id, metadataId, action, username, time) =>
+      InsertAuditRow(id, metadataId, action, username, time.toInstant)
+  } { a =>
+    (
+      a.id,
+      a.metadataId,
+      a.action,
+      a.username,
+      OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault())
+    )
   }
-
+  /*
+  id            | uuid                     |           | not null |
+ predecessor   | uuid                     |           |          |
+ seq_nr        | integer                  |           | not null |
+ subject       | character varying        |           |          |
+ content       | character varying        |           | not null |
+ audience      | character varying        |           | not null |
+ username      | character varying        |           | not null |
+ sys_id_origin | character varying        |           |          |
+ created_at    | timestamp with time zone |           |          |
+   */
+def insertMessageCommand: Command[InsertMessageRow] =
+  sql"""
+       INSERT INTO messages (id, predecessor, seq_nr, subject, content, audience, username, sys_id_origin, created_at)
+       VALUES($messageCodec)
+     """.command
 def insertCommand: Command[InsertMetadataRow] =
   sql"""
     INSERT INTO metadata VALUES($codec)
@@ -130,10 +223,24 @@ def insertAttachmentCommand: Command[InsertAttachmentRow] =
     """.command
 
 def insertAuditCommand: Command[InsertAuditRow] =
-sql"""
+  sql"""
      INSERT INTO audit (id, metadata_id, action, username, time) VALUES ($auditCodec)
    """.command
 
+def eventToMessageInsert(msg: EventMessage[Event]): InsertMessageRow = {
+  val m = msg.payload.asInstanceOf[Event.Created]
+  InsertMessageRow(
+    id = UUID.fromString(msg.metadata.stream),
+    predecessor = m.parent,
+    sequenceNumber = 0,
+    subject = m.items.find(_.name == "subject").map(_.value),
+    content = filterItem(m.items, "content"),
+    audience = filterItem(m.items, "audience"),
+    createdBy = m.user,
+    systemOrigin = filterItem(m.items, "systemOrigin"),
+    createdAt = msg.metadata.time.toInstant()
+  )
+}
 def filterItem(items: List[MetadataItem], arg: String): String =
   items.find(_.name == arg).map(_.value).get
 def itemsToAttachment(
@@ -162,12 +269,21 @@ def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
     c.category
   )
 }
-def itemToRow(metadataId:UUID, metadataItem: MetadataItem): InsertItemRow = InsertItemRow(
-  metadataItem.id,
-  metadataId,
-  metadataItem.name,
-  metadataItem.value
-)
+def itemToRow(metadataId: UUID, metadataItem: MetadataItem): InsertItemRow =
+  InsertItemRow(
+    metadataItem.id,
+    metadataId,
+    metadataItem.name,
+    metadataItem.value
+  )
+def processMessage[F[_]: Monad](
+    s: Session[F],
+    event: EventMessage[Event]
+) = for {
+  insertMessage <- eventToMessageInsert(event).pure
+  command <- s.prepare(insertMessageCommand)
+  rowcount <- command.execute(eventToMessageInsert(event))
+} yield ()
 def processAttachment[F[_]: Monad: Console](
     s: Session[F],
     event: EventMessage[Event]
@@ -176,14 +292,24 @@ def processAttachment[F[_]: Monad: Console](
   command <- s.prepare(insertAttachmentCommand)
   rowCount <- command.execute(itemsToAttachment(event))
   auditCommand <- s.prepare(insertAuditCommand)
-  rowCountAudit <- auditCommand.execute(InsertAuditRow(UUID.randomUUID(), insertAttachment.id, "Create attachment", "default user", Instant.now()))
+  rowCountAudit <- auditCommand.execute(
+    InsertAuditRow(
+      UUID.randomUUID(),
+      insertAttachment.id,
+      "Create attachment",
+      "default user",
+      Instant.now()
+    )
+  )
 } yield ()
 
-def processItem[F[_]:Monad:Console] (
-    s:Session[F], item: MetadataItem, metadataId: UUID
-                                   ):F[Completion] = for {
-    itemCommand <- s.prepare(insertItemCommand)
-    r <- itemCommand.execute(itemToRow(metadataId, item))
+def processItem[F[_]: Monad: Console](
+    s: Session[F],
+    item: MetadataItem,
+    metadataId: UUID
+): F[Completion] = for {
+  itemCommand <- s.prepare(insertItemCommand)
+  r <- itemCommand.execute(itemToRow(metadataId, item))
 } yield r
 def processMetadata[F[_]: Monad: Console](
     s: Session[F],
@@ -192,10 +318,20 @@ def processMetadata[F[_]: Monad: Console](
   m <- itemsToMetadata(event).pure
   command <- s.prepare(insertCommand)
   rowCount <- command.execute(m)
-  r <- event.payload.asInstanceOf[Created].items.traverse(i => processItem[F](s, i,
-    UUID.fromString(event.metadata.stream)))
+  r <- event.payload
+    .asInstanceOf[Created]
+    .items
+    .traverse(i => processItem[F](s, i, UUID.fromString(event.metadata.stream)))
   auditCommand <- s.prepare(insertAuditCommand)
-  a <- auditCommand.execute(InsertAuditRow(UUID.randomUUID(), m.id, "Created metadata", "default user", Instant.now()))
+  a <- auditCommand.execute(
+    InsertAuditRow(
+      UUID.randomUUID(),
+      m.id,
+      "Created metadata",
+      "default user",
+      Instant.now()
+    )
+  )
 //  itemCommand <- s.prepare(insertItemCommand)
 //  r <- event.payload.asInstanceOf[Created].items.map(i =>
 //    itemCommand.execute(itemToRow(UUID.fromString(event.metadata.stream), i))).reduce((l,r) => l)
@@ -208,6 +344,7 @@ final case class SkunkReadModelOps[F[_]: Monad: Concurrent: Console](
     pool.use(s =>
       event.payload match {
         case Created(_, _, "attachment", _, _) => processAttachment(s, event)
+        case Created(_, _, "message", _, _) => processMessage(s, event)
         case _                                 => processMetadata(s, event)
       }
     )
