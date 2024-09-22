@@ -256,7 +256,7 @@ def itemsToAttachment(
     contentType = filterItem(c.items, "contentType"),
     location = filterItem(c.items, "location"),
     version = 0,
-    createdAt = Instant.now()
+    createdAt = eventMessage.metadata.time.toInstant
   )
 }
 def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
@@ -341,6 +341,7 @@ final case class SkunkReadModelOps[F[_]: Monad: Concurrent: Console](
     pool: Resource[F, Session[F]]
 ) extends ReadModelOps[F, Event] {
   override def process(event: EventMessage[Event]): F[Unit] = {
+
     pool.use(s =>
       event.payload match {
         case Created(_, _, "attachment", _, _) => processAttachment(s, event)
