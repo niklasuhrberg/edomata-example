@@ -61,287 +61,14 @@ case class InsertItemRow(
     value: String
 )
 
-/*
-    id            uuid primary key not null,
-    predecessor   uuid,
-    seq_nr        integer          not null,
-    subject       varchar,
-    content       varchar          not null,
-    audience      varchar,
-    username      varchar,
-    sys_id_origin varchar,
-    created_at    timestamptz DEFAULT CURRENT_TIMESTAMP
- */
-val messageCodec: Codec[InsertMessageRow] =
-  (
-    uuid,
-    uuid.opt,
-    int4,
-    varchar.opt,
-    varchar,
-    varchar,
-    varchar,
-    varchar,
-    timestamptz
-  ).tupled.imap {
-    case (
-          id,
-          predecessor,
-          sequenceNumber,
-          subject,
-          content,
-          audience,
-          createdBy,
-          systemOrigin,
-          createdAt
-        ) =>
-      InsertMessageRow(
-        id = id,
-        predecessor = predecessor,
-        sequenceNumber = sequenceNumber,
-        subject = subject,
-        content = content,
-        audience = audience,
-        createdBy = createdBy,
-        systemOrigin = systemOrigin,
-        createdAt = createdAt.toInstant()
-      )
-  } { m =>
-    (
-      m.id,
-      m.predecessor,
-      m.sequenceNumber,
-      m.subject,
-      m.content,
-      m.audience,
-      m.createdBy,
-      m.systemOrigin,
-      OffsetDateTime.ofInstant(m.createdAt, ZoneId.systemDefault())
-    )
-  }
 
-val attachemtCodec: Codec[InsertAttachmentRow] =
-  (
-    uuid,
-    varchar,
-    varchar,
-    varchar,
-    varchar,
-    varchar,
-    varchar,
-    int4,
-    timestamptz
-  ).tupled.imap {
-    case (
-          id,
-          status,
-          name,
-          fileExtension,
-          description,
-          contentType,
-          location,
-          version,
-          createdAt
-        ) =>
-      InsertAttachmentRow(
-        id,
-        status,
-        name,
-        fileExtension,
-        description,
-        contentType,
-        location,
-        version,
-        createdAt.toInstant
-      )
-  } { a =>
-    (
-      a.id,
-      a.status,
-      a.name,
-      a.fileExtension,
-      a.description,
-      a.contentType,
-      a.location,
-      a.version,
-      OffsetDateTime.ofInstant(a.createdAt, ZoneId.systemDefault())
-    )
-  }
 
-val codec: Codec[InsertMetadataRow] =
-  (uuid, uuid, uuid.opt, varchar, varchar).tupled.imap {
-    case (id, entityId, parent, createdBy, category) =>
-      InsertMetadataRow(id, entityId, parent, createdBy, category)
-  } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
-val itemCodec: Codec[InsertItemRow] =
-  (uuid, uuid, varchar, varchar).tupled.imap {
-    case (id, metadataId, name, value) =>
-      InsertItemRow(id, metadataId, name, value)
-  } { item => (item.id, item.metadataId, item.name, item.value) }
-
-val auditCodec: Codec[InsertAuditRow] =
-  (uuid, uuid, varchar, varchar, timestamptz).tupled.imap {
-    case (id, metadataId, action, username, time) =>
-      InsertAuditRow(id, metadataId, action, username, time.toInstant)
-  } { a =>
-    (
-      a.id,
-      a.metadataId,
-      a.action,
-      a.username,
-      OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault())
-    )
-  }
-  /*
-  id            | uuid                     |           | not null |
- predecessor   | uuid                     |           |          |
- seq_nr        | integer                  |           | not null |
- subject       | character varying        |           |          |
- content       | character varying        |           | not null |
- audience      | character varying        |           | not null |
- username      | character varying        |           | not null |
- sys_id_origin | character varying        |           |          |
- created_at    | timestamp with time zone |           |          |
-   */
-def insertMessageCommand: Command[InsertMessageRow] =
-  sql"""
-       INSERT INTO messages (id, predecessor, seq_nr, subject, content, audience, username, sys_id_origin, created_at)
-       VALUES($messageCodec)
-     """.command
-def insertCommand: Command[InsertMetadataRow] =
-  sql"""
-    INSERT INTO metadata VALUES($codec)
-    """.command
-def insertItemCommand: Command[InsertItemRow] =
-  sql"""
-       INSERT INTO items (id, metadata_id, name, value) VALUES($itemCodec)
-     """.command
-
-def insertAttachmentCommand: Command[InsertAttachmentRow] =
-  sql"""
-    INSERT INTO attachments VALUES($attachemtCodec)
-    """.command
-
-def insertAuditCommand: Command[InsertAuditRow] =
-  sql"""
-     INSERT INTO audit (id, metadata_id, action, username, time) VALUES ($auditCodec)
-   """.command
-
-def eventToMessageInsert(msg: EventMessage[Event]): InsertMessageRow = {
-  val m = msg.payload.asInstanceOf[Event.Created]
-  InsertMessageRow(
-    id = UUID.fromString(msg.metadata.stream),
-    predecessor = m.parent,
-    sequenceNumber = 0,
-    subject = m.items.find(_.name == "subject").map(_.value),
-    content = filterItem(m.items, "content"),
-    audience = filterItem(m.items, "audience"),
-    createdBy = m.user,
-    systemOrigin = filterItem(m.items, "systemOrigin"),
-    createdAt = msg.metadata.time.toInstant()
-  )
-}
-def filterItem(items: List[MetadataItem], arg: String): String =
-  items.find(_.name == arg).map(_.value).get
-def itemsToAttachment(
-    eventMessage: EventMessage[Event]
-): InsertAttachmentRow = {
-  val c = eventMessage.payload.asInstanceOf[Event.Created]
-  InsertAttachmentRow(
-    id = UUID.fromString(eventMessage.metadata.stream),
-    status = filterItem(c.items, "status"),
-    name = filterItem(c.items, "name"),
-    fileExtension = filterItem(c.items, "fileExtension"),
-    description = filterItem(c.items, "description"),
-    contentType = filterItem(c.items, "contentType"),
-    location = filterItem(c.items, "location"),
-    version = 0,
-    createdAt = eventMessage.metadata.time.toInstant
-  )
-}
-def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
-  val c = eventMessage.payload.asInstanceOf[Event.Created]
-  InsertMetadataRow(
-    UUID.fromString(eventMessage.metadata.stream),
-    c.entityId,
-    c.parent,
-    c.user,
-    c.category
-  )
-}
-def itemToRow(metadataId: UUID, metadataItem: MetadataItem): InsertItemRow =
-  InsertItemRow(
-    metadataItem.id,
-    metadataId,
-    metadataItem.name,
-    metadataItem.value
-  )
-def processMessage[F[_]: Monad](
-    s: Session[F],
-    event: EventMessage[Event]
-) = for {
-  insertMessage <- eventToMessageInsert(event).pure
-  command <- s.prepare(insertMessageCommand)
-  rowcount <- command.execute(eventToMessageInsert(event))
-} yield ()
-def processAttachment[F[_]: Monad: Console](
-    s: Session[F],
-    event: EventMessage[Event]
-): F[Unit] = for {
-  insertAttachment <- itemsToAttachment(event).pure
-  command <- s.prepare(insertAttachmentCommand)
-  rowCount <- command.execute(itemsToAttachment(event))
-  auditCommand <- s.prepare(insertAuditCommand)
-  rowCountAudit <- auditCommand.execute(
-    InsertAuditRow(
-      UUID.randomUUID(),
-      insertAttachment.id,
-      "Create attachment",
-      "default user",
-      Instant.now()
-    )
-  )
-} yield ()
-
-def processItem[F[_]: Monad: Console](
-    s: Session[F],
-    item: MetadataItem,
-    metadataId: UUID
-): F[Completion] = for {
-  itemCommand <- s.prepare(insertItemCommand)
-  r <- itemCommand.execute(itemToRow(metadataId, item))
-} yield r
-def processMetadata[F[_]: Monad: Console](
-    s: Session[F],
-    event: EventMessage[Event]
-): F[Unit] = for {
-  m <- itemsToMetadata(event).pure
-  command <- s.prepare(insertCommand)
-  rowCount <- command.execute(m)
-  r <- event.payload
-    .asInstanceOf[Created]
-    .items
-    .traverse(i => processItem[F](s, i, UUID.fromString(event.metadata.stream)))
-  auditCommand <- s.prepare(insertAuditCommand)
-  a <- auditCommand.execute(
-    InsertAuditRow(
-      UUID.randomUUID(),
-      m.id,
-      "Created metadata",
-      "default user",
-      Instant.now()
-    )
-  )
-//  itemCommand <- s.prepare(insertItemCommand)
-//  r <- event.payload.asInstanceOf[Created].items.map(i =>
-//    itemCommand.execute(itemToRow(UUID.fromString(event.metadata.stream), i))).reduce((l,r) => l)
-} yield ()
 
 final case class SkunkReadModelOps[F[_]: Monad: Concurrent: Console](
     pool: Resource[F, Session[F]]
 ) extends ReadModelOps[F, Event] {
   override def process(event: EventMessage[Event]): F[Unit] = {
-
+    import SkunkReadModelOps.*
     pool.use(s =>
       event.payload match {
         case Created(_, _, "attachment", _, _) => processAttachment(s, event)
@@ -357,4 +84,270 @@ object SkunkReadModelOps {
       pool: Resource[F, Session[F]]
   ): F[SkunkReadModelOps[F]] =
     Sync[F].delay(new SkunkReadModelOps[F](pool))
+
+
+  val messageCodec: Codec[InsertMessageRow] =
+    (
+      uuid,
+      uuid.opt,
+      int4,
+      varchar.opt,
+      varchar,
+      varchar,
+      varchar,
+      varchar,
+      timestamptz
+    ).tupled.imap {
+      case (
+        id,
+        predecessor,
+        sequenceNumber,
+        subject,
+        content,
+        audience,
+        createdBy,
+        systemOrigin,
+        createdAt
+        ) =>
+        InsertMessageRow(
+          id = id,
+          predecessor = predecessor,
+          sequenceNumber = sequenceNumber,
+          subject = subject,
+          content = content,
+          audience = audience,
+          createdBy = createdBy,
+          systemOrigin = systemOrigin,
+          createdAt = createdAt.toInstant()
+        )
+    } { m =>
+      (
+        m.id,
+        m.predecessor,
+        m.sequenceNumber,
+        m.subject,
+        m.content,
+        m.audience,
+        m.createdBy,
+        m.systemOrigin,
+        OffsetDateTime.ofInstant(m.createdAt, ZoneId.systemDefault())
+      )
+    }
+
+  val attachemtCodec: Codec[InsertAttachmentRow] =
+    (
+      uuid,
+      varchar,
+      varchar,
+      varchar,
+      varchar,
+      varchar,
+      varchar,
+      int4,
+      timestamptz
+    ).tupled.imap {
+      case (
+        id,
+        status,
+        name,
+        fileExtension,
+        description,
+        contentType,
+        location,
+        version,
+        createdAt
+        ) =>
+        InsertAttachmentRow(
+          id,
+          status,
+          name,
+          fileExtension,
+          description,
+          contentType,
+          location,
+          version,
+          createdAt.toInstant
+        )
+    } { a =>
+      (
+        a.id,
+        a.status,
+        a.name,
+        a.fileExtension,
+        a.description,
+        a.contentType,
+        a.location,
+        a.version,
+        OffsetDateTime.ofInstant(a.createdAt, ZoneId.systemDefault())
+      )
+    }
+
+  val codec: Codec[InsertMetadataRow] =
+    (uuid, uuid, uuid.opt, varchar, varchar).tupled.imap {
+      case (id, entityId, parent, createdBy, category) =>
+        InsertMetadataRow(id, entityId, parent, createdBy, category)
+    } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
+  val itemCodec: Codec[InsertItemRow] =
+    (uuid, uuid, varchar, varchar).tupled.imap {
+      case (id, metadataId, name, value) =>
+        InsertItemRow(id, metadataId, name, value)
+    } { item => (item.id, item.metadataId, item.name, item.value) }
+
+  val auditCodec: Codec[InsertAuditRow] =
+    (uuid, uuid, varchar, varchar, timestamptz).tupled.imap {
+      case (id, metadataId, action, username, time) =>
+        InsertAuditRow(id, metadataId, action, username, time.toInstant)
+    } { a =>
+      (
+        a.id,
+        a.metadataId,
+        a.action,
+        a.username,
+        OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault())
+      )
+    }
+
+  def insertMessageCommand: Command[InsertMessageRow] =
+    sql"""
+           INSERT INTO messages (id, predecessor, seq_nr, subject, content, audience, username, sys_id_origin, created_at)
+           VALUES($messageCodec)
+         """.command  
+
+  def insertCommand: Command[InsertMetadataRow] =
+    sql"""
+      INSERT INTO metadata VALUES($codec)
+      """.command
+
+  def insertItemCommand: Command[InsertItemRow] =
+    sql"""
+         INSERT INTO items (id, metadata_id, name, value) VALUES($itemCodec)
+       """.command
+
+  def insertAttachmentCommand: Command[InsertAttachmentRow] =
+    sql"""
+      INSERT INTO attachments VALUES($attachemtCodec)
+      """.command
+
+  def insertAuditCommand: Command[InsertAuditRow] =
+    sql"""
+       INSERT INTO audit (id, metadata_id, action, username, time) VALUES ($auditCodec)
+     """.command
+
+  def eventToMessageInsert(msg: EventMessage[Event]): InsertMessageRow = {
+    val m = msg.payload.asInstanceOf[Event.Created]
+    InsertMessageRow(
+      id = UUID.fromString(msg.metadata.stream),
+      predecessor = m.parent,
+      sequenceNumber = 0,
+      subject = m.items.find(_.name == "subject").map(_.value),
+      content = filterItem(m.items, "content"),
+      audience = filterItem(m.items, "audience"),
+      createdBy = m.user,
+      systemOrigin = filterItem(m.items, "systemOrigin"),
+      createdAt = msg.metadata.time.toInstant()
+    )
+  }
+
+  def filterItem(items: List[MetadataItem], arg: String): String =
+    items.find(_.name == arg).map(_.value).get
+
+  def itemsToAttachment(
+                         eventMessage: EventMessage[Event]
+                       ): InsertAttachmentRow = {
+    val c = eventMessage.payload.asInstanceOf[Event.Created]
+    InsertAttachmentRow(
+      id = UUID.fromString(eventMessage.metadata.stream),
+      status = filterItem(c.items, "status"),
+      name = filterItem(c.items, "name"),
+      fileExtension = filterItem(c.items, "fileExtension"),
+      description = filterItem(c.items, "description"),
+      contentType = filterItem(c.items, "contentType"),
+      location = filterItem(c.items, "location"),
+      version = 0,
+      createdAt = eventMessage.metadata.time.toInstant
+    )
+  }
+
+  def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
+    val c = eventMessage.payload.asInstanceOf[Event.Created]
+    InsertMetadataRow(
+      UUID.fromString(eventMessage.metadata.stream),
+      c.entityId,
+      c.parent,
+      c.user,
+      c.category
+    )
+  }
+
+  def itemToRow(metadataId: UUID, metadataItem: MetadataItem): InsertItemRow =
+    InsertItemRow(
+      metadataItem.id,
+      metadataId,
+      metadataItem.name,
+      metadataItem.value
+    )
+
+  def processMessage[F[_] : Monad](
+                                    s: Session[F],
+                                    event: EventMessage[Event]
+                                  ) = for {
+    insertMessage <- eventToMessageInsert(event).pure
+    command <- s.prepare(insertMessageCommand)
+    rowcount <- command.execute(eventToMessageInsert(event))
+  } yield ()
+
+  def processAttachment[F[_] : Monad : Console](
+                                                 s: Session[F],
+                                                 event: EventMessage[Event]
+                                               ): F[Unit] = for {
+    insertAttachment <- itemsToAttachment(event).pure
+    command <- s.prepare(insertAttachmentCommand)
+    rowCount <- command.execute(itemsToAttachment(event))
+    auditCommand <- s.prepare(insertAuditCommand)
+    rowCountAudit <- auditCommand.execute(
+      InsertAuditRow(
+        UUID.randomUUID(),
+        insertAttachment.id,
+        "Create attachment",
+        "default user",
+        Instant.now()
+      )
+    )
+  } yield ()
+
+  def processItem[F[_] : Monad : Console](
+                                           s: Session[F],
+                                           item: MetadataItem,
+                                           metadataId: UUID
+                                         ): F[Completion] = for {
+    itemCommand <- s.prepare(insertItemCommand)
+    r <- itemCommand.execute(itemToRow(metadataId, item))
+  } yield r
+
+  def processMetadata[F[_] : Monad : Console](
+                                               s: Session[F],
+                                               event: EventMessage[Event]
+                                             ): F[Unit] = for {
+    m <- itemsToMetadata(event).pure
+    command <- s.prepare(insertCommand)
+    rowCount <- command.execute(m)
+    r <- event.payload
+      .asInstanceOf[Created]
+      .items
+      .traverse(i => processItem[F](s, i, UUID.fromString(event.metadata.stream)))
+    auditCommand <- s.prepare(insertAuditCommand)
+    a <- auditCommand.execute(
+      InsertAuditRow(
+        UUID.randomUUID(),
+        m.id,
+        "Created metadata",
+        "default user",
+        Instant.now()
+      )
+    )
+    //  itemCommand <- s.prepare(insertItemCommand)
+    //  r <- event.payload.asInstanceOf[Created].items.map(i =>
+    //    itemCommand.execute(itemToRow(UUID.fromString(event.metadata.stream), i))).reduce((l,r) => l)
+  } yield ()
+
 }

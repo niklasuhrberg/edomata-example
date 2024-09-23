@@ -1,10 +1,11 @@
 package dev.hnaderi.example
-
+import dev.hnaderi.example.read.MessageRetrievalOps
 import cats.FlatMap
 import cats.data.*
 import cats.effect.Async
 import cats.syntax.all.*
 import dev.hnaderi.example.metadata.{Metadata, MetadataApp, MetadataItem, Rejection}
+import dev.hnaderi.example.read.MessageRetrievalOps
 import edomata.backend.eventsourcing.AggregateState
 import edomata.core.CommandMessage
 import io.circe.generic.auto.*
@@ -37,7 +38,9 @@ object MetadataRoutes:
           ().rightNec
       })
 
-  def metadataRoutes[F[_] : Async : FlatMap](M: MetadataApp[F[_]]): HttpRoutes[F] =
+  def metadataRoutes[F[_] : Async : FlatMap](M: MetadataApp[F[_]],
+                                             R: MessageRetrievalOps[F]
+                                             ): HttpRoutes[F[_]] = //R: MessageRetrievalOps[F[_]]
 
 
     val dsl = new Http4sDsl[F] {}
@@ -52,7 +55,11 @@ object MetadataRoutes:
           }
           response <- Ok(md)
         } yield response
-
+      case GET -> Root / "messages" / id =>
+        for {
+          md <- R.messagesForEntity(UUID.fromString(id))
+          response <- Ok(md.compile.toList)
+        } yield response  
       case arg@POST -> Root / "metadata" =>
         (for {
           mc <- EitherT[F, NonEmptyChain[Rejection], MetadataCreation](arg.as[MetadataCreation].map(m => m.asRight))
