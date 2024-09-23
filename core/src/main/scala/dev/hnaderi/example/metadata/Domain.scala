@@ -9,9 +9,9 @@ import edomata.syntax.all.*
 import java.util.UUID
 
 case class MetadataItem(id: UUID, name: String, value: String)
-
+case class EntityId(id: String, entityType: String)
 enum Event {
-  case Created(entityId: String, parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
+  case Created(entityId: Option[EntityId], parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
   case ItemAdded(item: MetadataItem, user:String)
 }
 
@@ -21,11 +21,11 @@ enum Rejection {
 }
 
 enum Metadata {
-  case Initialized(entityId: String, parent: Option[UUID], category: String, contents: List[MetadataItem])
+  case Initialized(entityId: Option[EntityId], parent: Option[UUID], category: String, contents: List[MetadataItem])
   case New
 
 
-  def create(entityId: String, parent: Option[UUID], category: String, user: String, items: List[MetadataItem]): Decision[Rejection, Event, Metadata] = this.decide {
+  def create(entityId: Option[EntityId], parent: Option[UUID], category: String, user: String, items: List[MetadataItem]): Decision[Rejection, Event, Metadata] = this.decide {
     case New => Decision.accept(Event.Created(entityId, parent, category, user, items))
     case _ => Decision.reject(Rejection.IllegalState)
   }

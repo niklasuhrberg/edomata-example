@@ -1,7 +1,10 @@
 {
   "category": "attachment",
   "metadataId": "3d6eea82-aaac-40e3-b2f3-d9d6ebeddaa8",
-  "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
+  "entityId": {
+    "id": "e30a5720-338d-49a3-9112-09441065ab6e",
+    "entityType": "ISOM_ORDER"
+  },
   "createdBy": "niuhr2",
   "items": [
     {

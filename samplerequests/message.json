@@ -1,17 +1,21 @@
 {
   "category": "message",
   "entityType": "ISOM_ORDER",
-  "metadataId": "0aa412ac-d220-461b-97e3-239d8512ac82",
-  "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
+  "metadataId": "0aa412ac-d220-461b-97e3-239d8512ac84",
+  "parent": "0aa412ac-d220-461b-97e3-239d8512ac83",
+  "entityId": {
+    "id": "e30a5720-338d-49a3-9112-09441065ab6e",
+    "entityType": "ISOM_ORDER"
+  },
   "createdBy": "niuhr2",
   "items": [
     {
       "name": "subject",
-      "value": "Delivery note"
+      "value": "Delivery note 2"
     },
     {
       "name": "content",
-      "value": "The delivery is on time"
+      "value": "The delivery is almost on time"
     },
     {
       "name": "audience",

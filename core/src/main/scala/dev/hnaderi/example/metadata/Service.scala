@@ -6,12 +6,12 @@ import dev.hnaderi.example.metadata.Notification.{ItemAdded, MetadataCreated}
 import java.util.UUID
 
 enum Command {
-  case Create(entityId: String, parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
+  case Create(entityId: Option[EntityId], parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
   case AddItem(item: MetadataItem, user: String)
 }
 
 enum Notification {
-  case MetadataCreated(metadataId: UUID, entityId: String)
+  case MetadataCreated(metadataId: UUID, entityId: Option[EntityId])
   case ItemAdded(metadataId: UUID, item: MetadataItem)
 }
 

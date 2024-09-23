@@ -21,7 +21,8 @@ create table entities
 create table metadata
 (
     id         uuid primary key not null,
-    entity_id  uuid,
+    entity_id  varchar,
+    entity_type varchar,
     parent     uuid,
     created_by varchar          not null,
     category   varchar          not null

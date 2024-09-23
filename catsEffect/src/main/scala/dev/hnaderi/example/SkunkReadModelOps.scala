@@ -1,5 +1,5 @@
 package dev.hnaderi.example
-import cats.Monad
+import cats.{Applicative, Monad}
 import cats.effect.std.Console
 import cats.effect.{Async, Concurrent, Resource, Sync}
 import cats.syntax.all.*
@@ -11,6 +11,7 @@ import skunk.implicits.sql
 import skunk.syntax.all.*
 import skunk.*
 import skunk.data.Completion
+import skunk.data.Completion.Insert
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
@@ -47,6 +48,7 @@ case class InsertAuditRow(
 case class InsertMetadataRow(
     id: UUID,
     entityId: String,
+    entityType: String,
     parent: Option[UUID],
     createdBy: String,
     category: String
@@ -205,10 +207,10 @@ object SkunkReadModelOps {
     }
 
   val codec: Codec[InsertMetadataRow] =
-    (uuid, varchar, uuid.opt, varchar, varchar).tupled.imap {
-      case (id, entityId, parent, createdBy, category) =>
-        InsertMetadataRow(id, entityId, parent, createdBy, category)
-    } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
+    (uuid, varchar, varchar, uuid.opt, varchar, varchar).tupled.imap {
+      case (id, entityId, entityType, parent, createdBy, category) =>
+        InsertMetadataRow(id, entityId, entityType, parent, createdBy, category)
+    } { inr => (inr.id, inr.entityId, inr.entityType, inr.parent, inr.createdBy, inr.category) }
   val itemCodec: Codec[InsertItemRow] =
     (uuid, uuid, varchar, varchar).tupled.imap {
       case (id, metadataId, name, value) =>
@@ -232,12 +234,21 @@ object SkunkReadModelOps {
 
   def insertEntityCommand: Command[InsertEntityRow] =
     sql"""
-         INSERT INTO entities (id, entitytype_id, entity_id) VALUES ($entityCodec)
+         INSERT INTO entities (id, entitytype_id, entity_id) VALUES ($entityCodec) ON CONFLICT DO NOTHING
        """.command
   def insertMessagesToEntitiesCommand: Command[InsertMessageToEntityRow] =
     sql"""
          INSERT INTO messages_entities (message_id, entity_id) VALUES ($messageToEntityCodec)
        """.command
+/*
+ insert into messages_entities (message_id, entity_id)
+ select '0aa412ac-d220-461b-97e3-239d8512ac81', id from entities where entity_id= 'e03ab607-ccd9-472b-a39b-1155c0c89a34' AND entitytype_id='ISOM_ORDER'
+ */
+
+  def insertMessagesToEntities2Command: Command[Tuple3[UUID, String, String]] =
+    sql"""
+           INSERT INTO messages_entities (message_id, entity_id) SELECT $uuid , id from entities where entity_id = $varchar AND entitytype_id=$varchar
+         """.command
 
   def insertMessageCommand: Command[InsertMessageRow] =
     sql"""
@@ -302,13 +313,17 @@ object SkunkReadModelOps {
 
   def itemsToMetadata(eventMessage: EventMessage[Event]): InsertMetadataRow = {
     val c = eventMessage.payload.asInstanceOf[Event.Created]
-    InsertMetadataRow(
-      UUID.fromString(eventMessage.metadata.stream),
-      c.entityId,
-      c.parent,
-      c.user,
-      c.category
+    c.entityId.fold(throw IllegalStateException("No entity id"))(entityId =>
+      InsertMetadataRow(
+        UUID.fromString(eventMessage.metadata.stream),
+        entityId.id,
+        entityId.entityType,
+        c.parent,
+        c.user,
+        c.category
+      )
     )
+
   }
 
   def itemToRow(metadataId: UUID, metadataItem: MetadataItem): InsertItemRow =
@@ -318,18 +333,37 @@ object SkunkReadModelOps {
       metadataItem.name,
       metadataItem.value
     )
+  def insertMessageMappingForNewEntity[F[_]: Monad](s: Session[F], entityId: UUID,
+                                                    messageId: UUID) = for {
+    command <- s.prepare(insertMessagesToEntitiesCommand)
+    rowCount <- command.execute(InsertMessageToEntityRow(messageId = messageId, entityId = entityId))
+  } yield ()
+  def insertMessageMappingForExistingEntity[F[_]: Monad](
+                                                          s: Session[F], insertEntity:InsertEntityRow, messageId: UUID) = for {
+    command <- s.prepare(insertMessagesToEntities2Command)
+    rowCount <- command.execute(Tuple3(messageId, insertEntity.entityId, insertEntity.entityType))
+  } yield()
 
   def processMessage[F[_] : Monad](
                                     s: Session[F],
                                     event: EventMessage[Event]
                                   ) = for {
+    createdEvent <- event.payload.asInstanceOf[Event.Created].pure
     insertMessage <- eventToMessageInsert(event).pure
     command <- s.prepare(insertMessageCommand)
-    // Insert entity, use id if rowcount == 1
-    //potentialEntityId <- UUID.randomUUID().pure
-    //insertEntity <- InsertEntityRow(potentialEntityId, event.payload.asInstanceOf[Event.Created])
-    // Insert mapping , if entity rowcount == 0, use embedded select
     rowcount <- command.execute(eventToMessageInsert(event))
+    // Insert entity, use id if rowcount == 1
+    insertEntity <- InsertEntityRow(UUID.randomUUID(),
+      createdEvent.entityId.get.entityType,
+      createdEvent.entityId.get.id).pure
+    entityCommand <- s.prepare(insertEntityCommand)
+    entityRowCount <- entityCommand.execute(insertEntity)
+    _ <- entityRowCount match {
+      case Insert(0) => insertMessageMappingForExistingEntity(s, insertEntity, UUID.fromString(event.metadata.stream))
+      case Insert(1) => insertMessageMappingForNewEntity(s, insertEntity.id, UUID.fromString(event.metadata.stream))
+    }
+    // Insert mapping , if entity rowcount == 0, use embedded select
+
   } yield ()
 
   def processAttachment[F[_] : Monad : Console](
