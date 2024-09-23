@@ -1,5 +1,4 @@
 package dev.hnaderi.example
-import dev.hnaderi.example.read.MessageRetrievalOps
 import cats.FlatMap
 import cats.data.*
 import cats.effect.Async

@@ -26,7 +26,7 @@ import java.util.UUID
 
 class DomainLogicSuite extends DomainSuite(msgId = "msg", address = "20187a0d-703d-4f52-9915-3cb7fad57e8e") {
   test("Test") {
-    val entityId = UUID.randomUUID()
+    val entityId = UUID.randomUUID().toString
     val item = MetadataItem(UUID.randomUUID(), "filename", "Kitchen Measurements")
     MetadataService[Id].expect(Command.Create(entityId, None, "categoryName", "niuhr2", List(item)), Metadata.New)(
       Metadata.Initialized(entityId, None, "categoryName", List(item)),

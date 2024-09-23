@@ -46,7 +46,7 @@ case class InsertAuditRow(
 )
 case class InsertMetadataRow(
     id: UUID,
-    entityId: UUID,
+    entityId: String,
     parent: Option[UUID],
     createdBy: String,
     category: String
@@ -205,7 +205,7 @@ object SkunkReadModelOps {
     }
 
   val codec: Codec[InsertMetadataRow] =
-    (uuid, uuid, uuid.opt, varchar, varchar).tupled.imap {
+    (uuid, varchar, uuid.opt, varchar, varchar).tupled.imap {
       case (id, entityId, parent, createdBy, category) =>
         InsertMetadataRow(id, entityId, parent, createdBy, category)
     } { inr => (inr.id, inr.entityId, inr.parent, inr.createdBy, inr.category) }
@@ -228,6 +228,7 @@ object SkunkReadModelOps {
         OffsetDateTime.ofInstant(a.time, ZoneId.systemDefault())
       )
     }
+
 
   def insertEntityCommand: Command[InsertEntityRow] =
     sql"""
@@ -324,6 +325,10 @@ object SkunkReadModelOps {
                                   ) = for {
     insertMessage <- eventToMessageInsert(event).pure
     command <- s.prepare(insertMessageCommand)
+    // Insert entity, use id if rowcount == 1
+    //potentialEntityId <- UUID.randomUUID().pure
+    //insertEntity <- InsertEntityRow(potentialEntityId, event.payload.asInstanceOf[Event.Created])
+    // Insert mapping , if entity rowcount == 0, use embedded select
     rowcount <- command.execute(eventToMessageInsert(event))
   } yield ()
 

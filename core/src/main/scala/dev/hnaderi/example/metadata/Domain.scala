@@ -11,7 +11,7 @@ import java.util.UUID
 case class MetadataItem(id: UUID, name: String, value: String)
 
 enum Event {
-  case Created(entityId: UUID, parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
+  case Created(entityId: String, parent: Option[UUID], category: String, user: String, items: List[MetadataItem])
   case ItemAdded(item: MetadataItem, user:String)
 }
 
@@ -21,11 +21,11 @@ enum Rejection {
 }
 
 enum Metadata {
-  case Initialized(entityId: UUID, parent: Option[UUID], category: String, contents: List[MetadataItem])
+  case Initialized(entityId: String, parent: Option[UUID], category: String, contents: List[MetadataItem])
   case New
 
 
-  def create(entityId: UUID, parent: Option[UUID], category: String, user: String, items: List[MetadataItem]): Decision[Rejection, Event, Metadata] = this.decide {
+  def create(entityId: String, parent: Option[UUID], category: String, user: String, items: List[MetadataItem]): Decision[Rejection, Event, Metadata] = this.decide {
     case New => Decision.accept(Event.Created(entityId, parent, category, user, items))
     case _ => Decision.reject(Rejection.IllegalState)
   }
@@ -51,8 +51,8 @@ object Metadata extends DomainModel[Metadata, Event, Rejection] {
 
   def transition = {
     case Event.ItemAdded(item, user) => _.mustBeInitialized.map(i => i.copy(contents = i.contents.appended(item)))
-    case Event.Created(metadataId, parent,category, user, items) => _.mustBeNew.map(n =>
-      Initialized(entityId = metadataId,
+    case Event.Created(entityId, parent,category, user, items) => _.mustBeNew.map(n =>
+      Initialized(entityId = entityId,
         parent = parent,
       category = category,
         contents = items))

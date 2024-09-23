@@ -16,12 +16,7 @@
 
 package dev.hnaderi.example
 
-import cats.effect.IO
 import cats.effect.IOApp
-import cats.effect.std.Console
-import edomata.core.CommandMessage
-
-import java.time.Instant
 
 
 
