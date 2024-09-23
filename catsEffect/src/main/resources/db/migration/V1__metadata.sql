@@ -13,8 +13,8 @@ create table entities
 (
     id            uuid primary key not null,
     entitytype_id varchar,
-    entity_id     uuid             not null,
-    UNIQUE (entity_id),
+    entity_id     varchar             not null,
+    UNIQUE (entitytype_id, entity_id),
     constraint entity_entitytypes_fk foreign key (entitytype_id) references entitytypes (id) on update RESTRICT on delete CASCADE
 );
 
@@ -46,7 +46,7 @@ create table attachments
     version       integer                   DEFAULT 0,
     created_at    timestamptz      not null DEFAULT CURRENT_TIMESTAMP
 );
-create table entities_attachments
+create table attachments_entities
 (
     entity_id     uuid not null,
     attachment_id uuid not null,

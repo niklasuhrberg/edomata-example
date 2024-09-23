@@ -15,6 +15,16 @@ import skunk.data.Completion
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
 
+case class InsertMessageToEntityRow(
+    messageId: UUID,
+    entityId: UUID
+                                   )
+case class InsertEntityRow(
+    id: UUID,
+    entityType: String,
+    entityId: String
+                          )
+
 case class InsertMessageRow(
     id: UUID,
     predecessor: Option[UUID],
@@ -85,6 +95,18 @@ object SkunkReadModelOps {
   ): F[SkunkReadModelOps[F]] =
     Sync[F].delay(new SkunkReadModelOps[F](pool))
 
+  val entityCodec: Codec[InsertEntityRow] =
+    (uuid, varchar, varchar).tupled.imap {
+      case (id, entityType, entityId) => InsertEntityRow(id, entityType, entityId)
+    }  {
+      case e => (e.id, e.entityType, e.entityId)
+    }
+  val messageToEntityCodec: Codec[InsertMessageToEntityRow] =
+    (uuid, uuid).tupled.imap {
+      case (messageId, entityId) => InsertMessageToEntityRow(messageId = messageId, entityId = entityId)
+    }  {
+      m => (m.messageId, m.entityId)
+    }
 
   val messageCodec: Codec[InsertMessageRow] =
     (
@@ -207,11 +229,20 @@ object SkunkReadModelOps {
       )
     }
 
+  def insertEntityCommand: Command[InsertEntityRow] =
+    sql"""
+         INSERT INTO entities (id, entitytype_id, entity_id) VALUES ($entityCodec)
+       """.command
+  def insertMessagesToEntitiesCommand: Command[InsertMessageToEntityRow] =
+    sql"""
+         INSERT INTO messages_entities (message_id, entity_id) VALUES ($messageToEntityCodec)
+       """.command
+
   def insertMessageCommand: Command[InsertMessageRow] =
     sql"""
            INSERT INTO messages (id, predecessor, seq_nr, subject, content, audience, username, sys_id_origin, created_at)
            VALUES($messageCodec)
-         """.command  
+         """.command
 
   def insertCommand: Command[InsertMetadataRow] =
     sql"""

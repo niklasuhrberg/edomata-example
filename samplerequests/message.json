@@ -1,5 +1,6 @@
 {
   "category": "message",
+  "entityType": "ISOM_ORDER",
   "metadataId": "0aa412ac-d220-461b-97e3-239d8512ac82",
   "entityId": "e30a5720-338d-49a3-9112-09441065ab6e",
   "createdBy": "niuhr2",
